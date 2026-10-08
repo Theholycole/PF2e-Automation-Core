@@ -71,6 +71,41 @@ export function planForcedMove(token, { point, direction = "away", feet, stopAt 
     return { to: settled, squares: taken, stoppedBy, feetLeft };
 }
 
+// --- Distance and emanations (auras) -------------------------------------------
+
+// PF2e's distance in feet between two creatures' spaces (boxes { x, y, w, h,
+// elevation? } in pixels and feet): squares between the nearest squares,
+// diagonals 5 then 10 feet; adjacent is 5 feet, overlapping 0. Elevation is a
+// third axis, counted the same way.
+export function distanceFeet(a, b, { size, gridFeet = 5 }) {
+    const gap = (startA, lengthA, startB, lengthB) => {
+        const apart = Math.max(startB - (startA + lengthA), startA - (startB + lengthB));
+        return apart < 0 ? 0 : Math.round(apart / size) + 1;
+    };
+    const along = (first, second) => Math.max(first, second) + Math.floor(Math.min(first, second) / 2);
+    const flat = along(gap(a.x, a.w, b.x, b.w), gap(a.y, a.h, b.y, b.h));
+    const rise = Math.round(Math.abs(Number(a.elevation ?? 0) - Number(b.elevation ?? 0)) / gridFeet);
+    return along(flat, rise) * gridFeet;
+}
+
+// Is a creature's space inside an emanation of this many feet from another's?
+export const withinEmanation = (source, creature, feet, grid) => distanceFeet(source, creature, grid) <= Number(feet);
+
+// The positions a token passes moving from one point to the next, square by
+// square in a straight line (both ends included; a teleport has only its ends).
+export function pathPositions(points, { size, teleport = () => false }) {
+    const positions = points.length ? [{ ...points[0] }] : [];
+    for (let index = 1; index < points.length; index++) {
+        const [from, to] = [points[index - 1], points[index]];
+        const steps = teleport(to) ? 1 : Math.max(1, Math.round(Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y)) / size));
+        for (let step = 1; step <= steps; step++) {
+            const share = step / steps;
+            positions.push({ ...to, x: Math.round(from.x + (to.x - from.x) * share), y: Math.round(from.y + (to.y - from.y) * share), elevation: (from.elevation ?? 0) + ((to.elevation ?? 0) - (from.elevation ?? 0)) * share });
+        }
+    }
+    return positions;
+}
+
 // Where a creature that would end in another's space ends instead: the free
 // space touching that creature nearest the intended spot (then nearest where it came from).
 export function freeSpaceNear(token, at, from, world) {

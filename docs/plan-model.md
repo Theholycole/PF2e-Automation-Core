@@ -96,7 +96,12 @@ The text stays alongside the structured form.
 ### 2.5 Stances, auras and reactions
 
 - **Stances:** `lifecycle.stance: true`. Entering one ends the user's other stances.
-- **Auras:** `targeting.area: { type: "emanation", value }` plus `trigger: { event: "aura", when: "enter" | "start-turn" | "end-turn" }`. Example: Frightful Presence.
+- **Auras:** `targeting.area: { type: "emanation", value }` plus `trigger: { event: "aura", when }`. Example: Frightful Presence.
+  - `when` is a list of `"enter"`, `"start-turn"` and `"end-turn"` (a single string is read as a list of one). An empty list means the aura acts on some other trigger, such as a creature Casting a Spell in it, and live play leaves it to the GM.
+  - `oncePerRound: true`: a damage-only aura, which Monster Core has hit a creature that enters it or starts its turn in it, once per round.
+  - `activeAfter: { ability, rounds }`: the aura acts only for that long after the named ability (Miasma after Poison Breath).
+  - A passive ability that isn't an aura (Death Throes, Defensive Quills) has `trigger.event: "passive"`.
+- **Immunity:** `trigger.immunity: { scope: "target", raw, duration: { value, unit }, degrees, against }`. `degrees` lists the results that grant it ("A creature that succeeds …"); `against` is `"source"` (this creature's ability) or `"all"` ("immune to all stench auras"). Live play records it as an effect on the creature.
 - **Reactions:** `activation.time: "reaction"` plus `trigger: { event: "reaction", when: "targeted-by-attack" | "hit" | "reduced-to-0-hp" | "ally-hit" | "enemy-moves-within-reach", raw }`.
 
 ### 2.6 Healing outside spells
@@ -194,7 +199,7 @@ core.planFor(item)   // the compiled plan from whichever module owns the item (c
 **Later:**
 
 - **As they're needed** (they patch nothing and can be imported until then): damage receipts, forced movement, condition timing.
-- **Before the ability module's aura family:** the ongoing journal manager and its single-coordinator queue. There must be exactly one.
+- **Before the ability module's aura family:** the ongoing journal manager and its single-coordinator queue. There must be exactly one. (2026-10-08: the ability module's aura cards keep no ongoing records. They read positions when a token moves and when a turn starts or ends, so they don't need the journal. Lingering areas will.)
 - **Eventually:** a single HP-change pipeline, once the ability module adds preUpdateActor HP interceptors of its own, so their order is defined. The spell module's existing ones (halved healing, no healing, covenant, HP pact) stay there until then.
 - **First inhabitants:** the helpers the cleanup is collecting into `scripts/runtime-utils.js` and `src/compiler/text-patterns.js`.
 
