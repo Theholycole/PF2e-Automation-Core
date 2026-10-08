@@ -64,6 +64,8 @@ function readFrequency(frequency) {
 
 function readCheck(check) {
     if (!isObject(check) || check.roll) return check;
+    // Version 12 skill checks (the ability compiler writes roll itself, but in case).
+    if (check.against?.statistic && !SAVES.includes(check.statistic) && check.statistic !== "spell-attack" && check.statistic !== "strike") return { ...check, roll: "skill" };
     // Version 12: a spell attack is the caster's spell attack against the target's AC;
     // anything else is the target's save against the source's DC.
     if (check.statistic === "spell-attack" || check.statistic === "strike") {

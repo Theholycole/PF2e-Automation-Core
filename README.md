@@ -2,7 +2,7 @@
 
 The `pf2e-resolution-core` Foundry module: the shared plan model, the pure resolver registry, the shared helpers, and the one copy of each shared PF2e patch. It serves PF2e Automatic Spell Resolution, PF2e Automatic Ability Resolution, PF2e Automatic Kineticist Resolution and the PF2e Combat Simulator.
 
-**Status (2026-10-08): milestone 2, step 3 under way.** 52 Node tests pass.
+**Status (2026-10-08): milestones 2 and 3 under way.** 54 Node tests pass.
 
 - **Step 1** is done: the version-13 model, outline check and reader, typed decisions, change ops, registry, roller and context contracts.
 - **Step 2** is done: the spell module runs on the core's patches in `pftest` (`api.patches.status()` shows `"core"` four times). Its guide is [docs/switch-over.md](docs/switch-over.md).
@@ -24,6 +24,7 @@ The `pf2e-resolution-core` Foundry module: the shared plan model, the pure resol
     - `native.damageTypeChoices` become a pre-cast decision per component.
     - `native.byActions` entries can bring their own `outcomes` and `check` (Blazing Bolt).
     - `native.applications` (Bless) become PF2e spell-effect changes on their recipients: self, target, allies or enemies in the area.
+- **Milestone 3:** the `check` family (`src/families/check.js`): the actor's skill against a target's DC (`check.roll: "skill"`, `against: { dc: "target", statistic }`), as basic actions and monster riders use it. Effects can name `recipient: "self"`, and `end-condition` effects end conditions (Escape). It shares the save family's steps.
 - A whole-catalogue test resolves every compiled plan of every family over the spell module's real compile (with its native-effect catalog), at every action count and two ranks.
 
 ### Families

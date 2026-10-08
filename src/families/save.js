@@ -49,7 +49,8 @@ export function saveGaps(plan) {
     if (resolution.healing && !healingOf(plan)) gaps.push({ path: "resolution.healing", what: "healing" });
     if (resolution.casterChoice && !CASTER_CHOICES.has(resolution.casterChoice.kind)) gaps.push({ path: "resolution.casterChoice", what: `casterChoice:${resolution.casterChoice.kind}` });
     const check = resolution.check;
-    if (!check || !(SAVES.includes(check.statistic) || check.statistic === "spell-attack" || check.statistic === "strike")) gaps.push({ path: "resolution.check", what: "check" });
+    const skillCheck = (check?.roll === "skill" || check?.roll === "perception") && check.statistic && check.against?.statistic;
+    if (!check || !(SAVES.includes(check.statistic) || check.statistic === "spell-attack" || check.statistic === "strike" || skillCheck)) gaps.push({ path: "resolution.check", what: "check" });
     for (const degree of DEGREES) {
         const outcome = resolution.outcomes?.[degree];
         if (!outcome) continue;
@@ -58,7 +59,7 @@ export function saveGaps(plan) {
             gaps.push({ path: `resolution.outcomes.${degree}.${key}`, what: key });
         }
         for (const [index, effect] of (outcome.effects ?? []).entries()) {
-            if (effect?.kind !== "condition") gaps.push({ path: `resolution.outcomes.${degree}.effects.${index}`, what: `effect:${effect?.kind}` });
+            if (effect?.kind !== "condition" && effect?.kind !== "end-condition") gaps.push({ path: `resolution.outcomes.${degree}.effects.${index}`, what: `effect:${effect?.kind}` });
         }
         for (const [index, entry] of (outcome.noteEffects ?? []).entries()) {
             if (entry?.choiceGroup && !(entry.choiceGroup === "caster-option" && resolution.casterChoice?.kind === "option")) gaps.push({ path: `resolution.outcomes.${degree}.noteEffects.${index}`, what: `choiceGroup:${entry.choiceGroup}` });
@@ -247,6 +248,15 @@ export function* saveSteps(plan, context = {}) {
             const penalty = check.sharedMultipleAttackPenalty ? -5 * Math.min(index, 2) : 0;
             // Phase Bolt's answer is the AC bonus it removes: a bonus to the attack.
             roll = yield { type: "roll", statistic: check.statistic, options: { actor: caster, target: actor, modifier: attacker.modifier + penalty + adjustment, dc: defence.dc } };
+        } else if (check.roll === "skill" || check.roll === "perception") {
+            // The actor's skill against the target's DC (Trip: Athletics against Reflex DC).
+            // A list of statistics (Escape): the actor's best.
+            const options = [].concat(check.statistic);
+            const slug = options.reduce((best, slug) => ((statisticOf(context, caster, slug).modifier ?? 0) > (statisticOf(context, caster, best).modifier ?? 0) ? slug : best));
+            const skill = statisticOf(context, caster, slug);
+            const defence = statisticOf(context, actor, check.against?.statistic ?? "will");
+            const dc = check.against?.dc === "fixed" ? check.against.value : defence.dc ?? 10 + (defence.modifier ?? 0);
+            roll = yield { type: "roll", statistic: slug, options: { actor: caster, target: actor, modifier: skill.modifier + adjustment, dc, traits: plan.traits ?? [] } };
         } else {
             const slugs = check.saveChoice?.statistics?.length ? check.saveChoice.statistics : [check.statistic];
             // The target's choice (Shadow Blast): its best save.
@@ -307,8 +317,10 @@ export function* saveSteps(plan, context = {}) {
         changes.push(...damageChanges(target, rolled));
 
         for (const effect of outcome.effects ?? []) {
-            if (effect?.kind !== "condition") continue;
-            changes.push({ op: "condition", target, slug: effect.slug, value: Number.isFinite(effect.value) ? effect.value : null, duration: effect.duration ?? null });
+            // recipient "self": the actor (Trip's critical failure, Escape's success).
+            const recipient = effect?.recipient === "self" && caster ? idOf(context, caster, -1) : target;
+            if (effect?.kind === "condition") changes.push({ op: "condition", target: recipient, slug: effect.slug, value: Number.isFinite(effect.value) ? effect.value : null, duration: effect.duration ?? null });
+            else if (effect?.kind === "end-condition") changes.push({ op: "end", target: recipient, what: { conditions: effect.slugs ?? [effect.slug], from: effect.recipient === "self" ? target : null } });
         }
         const movement = outcome.forcedMovement;
         if (movement && ["push", "pull"].includes(movement.kind) && Number.isFinite(movement.distance)) {
