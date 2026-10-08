@@ -47,3 +47,5 @@ A family turns a plan into Change ops and typed decisions. It's written as **ste
 | `docs/switch-over.md` | what the spell module changes to use the core |
 
 Run the tests with `node --test`.
+
+**Forced movement** (`src/model/grid.js`, pure; `scripts/forced-movement.js`, Foundry; `api.forcedMovement.forcedMove`): pushes and pulls by the user's grid rule of 2026-10-05: square by square in the nearest of the 8 directions, diagonals 5 then 10 feet, stopping at walls and the scene's edge, never ending in another creature's space. The ability module's cards use it; the spell module has its own copy (`scripts/forced-movement.js`) and can switch to this one.
