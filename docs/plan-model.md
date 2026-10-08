@@ -101,6 +101,7 @@ The text stays alongside the structured form.
   - `oncePerRound: true`: a damage-only aura, which Monster Core has hit a creature that enters it or starts its turn in it, once per round.
   - `activeAfter: { ability, rounds }`: the aura acts only for that long after the named ability (Miasma after Poison Breath).
   - A passive ability that isn't an aura (Death Throes, Defensive Quills) has `trigger.event: "passive"`.
+- **Conditions while in an aura:** a condition's `duration: { mode: "in-aura", after? }` lasts while the creature stays in the aura ("while it remains in the area"). `after: { value, unit }` keeps it that long after leaving ("persists for 3 rounds after leaving the aura", "recovers after it has been out of the aura for 1 minute"). The core passes it through; live play ends it when the creature leaves; the simulator counts it as the whole fight.
 - **Immunity:** `trigger.immunity: { scope: "target", raw, duration: { value, unit }, degrees, against }`. `degrees` lists the results that grant it ("A creature that succeeds …"); `against` is `"source"` (this creature's ability) or `"all"` ("immune to all stench auras"). Live play records it as an effect on the creature.
 - **Reactions:** `activation.time: "reaction"` plus `trigger: { event: "reaction", when: "targeted-by-attack" | "hit" | "reduced-to-0-hp" | "ally-hit" | "enemy-moves-within-reach", raw }`.
 
