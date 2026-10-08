@@ -170,7 +170,9 @@ The simulator applies what it can model (damage, healing, temporary HP, conditio
 Additions for the skill actions (milestone 3, 2026-10-08):
 - A `condition` change can carry `scope: { attacker, attacks: "any" | "melee", uses }`: off-guard only to that creature's attacks, for that many of them (`null`: every one while it lasts). Used by Feint and Create a Diversion.
 - An `effect` change of kind `disarm` (`{ kind: "disarm", what: "drop" | "weaken", penalty }`) knocks a held item away or weakens the grip on it.
+- An `effect` change of kind `swallow` (`{ kind: "swallow", damage, rupture, size }`) is Swallow Whole: the target is swallowed, takes `damage` at the end of each of its turns, and cuts itself free when the swallower takes `rupture` piercing or slashing damage from one attack.
 - An `end` change's `what` can say `stabilize: true` (Administer First Aid): dying ends, but the creature stays unconscious.
+- The ability module's creature afflictions give `affliction` changes whose `data` has the stages in numbers: `{ name, traits, statistic, dc, maximumDuration, onset, stages: [{ stage, damage: [formula], conditions: [{ slug, value }], duration: { value, unit }, death? }], stage }`. The spell module's hand-offs keep their stages as text.
 
 ## 5. Registry
 
