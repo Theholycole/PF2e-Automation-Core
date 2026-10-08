@@ -211,7 +211,7 @@ core.planFor(item)   // the compiled plan from whichever module owns the item (c
 - `check.roll` and `check.against`, plus per-target degrees, defence switching and counteract.
 - Decisions are typed and phased; the resolver has `resolveEvent` for ongoing records; rolls go through a roller service; geometry and IWR come through context services.
 - The Change ops list above, and the day-one ownership list.
-- Live play stays confirmation-first for spells and abilities.
+- Live play stays confirmation-first for spells and abilities. The user confirmed this for spells sharing the core on 2026-10-08.
 
 ## 9. Still open
 
