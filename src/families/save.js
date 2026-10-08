@@ -340,7 +340,8 @@ export function* saveSteps(plan, context = {}) {
             changes.push({ op: "move", target, kind: movement.kind, distance: movement.distance, direction: movement.direction ?? null, upTo: Boolean(movement.upTo), optional: Boolean(movement.optional) });
         }
         for (const modifier of outcome.modifiers ?? []) {
-            changes.push({ op: "effect", target, effect: { kind: "modifier", modifier } });
+            // A penalty on the actor itself (Bon Mot's critical failure: "You take the same penalty").
+            changes.push({ op: "effect", target: modifier?.recipient === "self" && caster ? idOf(context, caster, -1) : target, effect: { kind: "modifier", modifier } });
         }
         for (const note of outcome.noteEffects ?? []) {
             if (note.choiceGroup === "caster-option" && option !== null && note.option !== option) continue;
