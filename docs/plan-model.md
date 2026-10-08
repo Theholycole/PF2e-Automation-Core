@@ -161,7 +161,8 @@ Change =
   | { op: "ongoing", action: "start" | "advance" | "end", record }
   | { op: "followUp", plan, when: "now" | event }   // a follow-up card whose button starts another resolution
   | { op: "affliction", target, data }              // hand-off to Pseudo Afflictions
-  | { op: "resource", target, key, delta }          | { op: "note", audience, text }
+  | { op: "resource", target, key, delta }          | { op: "note", audience, text, manual? }
+  | { op: "death", target, ifReducedTo? }           // death effects (added in step 3.1)
 ```
 
 The simulator applies what it can model (damage, healing, temporary HP, conditions, effects it understands, movement in bands, ending effects, resources) and counts the rest as gaps. That keeps the gap report honest.
@@ -199,8 +200,8 @@ core.planFor(item)   // the compiled plan from whichever module owns the item (c
    - `runtime-utils.js` and `text-patterns.js` as its first code
 2. **Day-one ownership:** move the shared prototype patches and conventions from section 6 into the core, with the spell module depending on it. That module's tests and a live regression run must stay green.
 3. **Families one at a time, as real splits** *(review)*. The spell runtimes are imperative executors today (EffectRuntime alone has about 370 methods), so each family is split into a pure resolver plus the apply layer, copying `basic-save-core.js`. Order, driven by the simulator:
-   1. basic saves and spell attacks (already split)
-   2. healing and temporary HP
+   1. basic saves and spell attacks (already split). **Built 2026-10-08** as the core's `save` family (`src/families/save.js`), written as steps (`src/drive.js`) so it runs sync in the simulator and async live. All 740 compiled `save` plans resolve and 436 have no gaps. It added one op, `{ op: "death", target, ifReducedTo? }`.
+   2. healing and temporary HP. **Built 2026-10-08** (healing; temporary HP is still to come): the `healing` and `direct-damage` families and Heal's healing half in `save`, on optional payloads the spell compiler fills from PF2e's item data. `resolution.healing` is `{ components, heightening, recipients }`, `resolution.byActions` holds action overlays, and `resolution.missiles` holds `{ perActions, perRanks }`.
    3. condition riders
    4. then the most common gaps in the simulator's gap report
 4. **Simulator switch:** a creature's ability counts as a gap only when it has no plan or its plan's kind has no registered family.

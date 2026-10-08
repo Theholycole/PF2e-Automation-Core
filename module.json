@@ -1,0 +1,30 @@
+{
+  "id": "pf2e-resolution-core",
+  "title": "PF2e Resolution Core",
+  "description": "The shared plan model, resolver registry and Foundry layer for PF2e Automatic Spell Resolution, PF2e Automatic Ability Resolution and the PF2e Combat Simulator.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "TheHolyCole"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "pf2e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "8.5.0",
+          "verified": "8.5.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ]
+}
