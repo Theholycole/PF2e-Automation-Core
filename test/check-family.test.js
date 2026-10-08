@@ -63,3 +63,21 @@ test("Escape: the best of the actor's statistics against the grabber's Athletics
     assert.deepEqual(result.changes, [{ op: "end", target: "fighter", what: { conditions: ["grabbed", "restrained"], from: "ogre" } }]);
     assert.deepEqual(registry.familyFor("check").gaps(ESCAPE), []);
 });
+
+test("Feint, Disarm and First Aid: off-guard to one creature's attacks, a disarm effect, and stabilizing", () => {
+    const offGuard = (scope, recipient) => ({ kind: "condition", slug: "off-guard", value: null, duration: null, scope, ...(recipient ? { recipient } : {}) });
+    const plan = (outcomes) => ({ modelVersion: 13, source: { name: "x" }, rank: 1, resolution: { kind: "check", check: { roll: "skill", statistic: "athletics", against: { dc: "target", statistic: "reflex" } }, outcomes: { criticalSuccess: none, success: none, failure: none, criticalFailure: none, ...outcomes } } });
+    const at = (degree) => ({ roll: () => ({ degree }) });
+    const feint = plan({ success: { ...none, effects: [offGuard({ against: "actor", attacks: "melee", uses: 1 })] }, criticalFailure: { ...none, effects: [offGuard({ against: "target", attacks: "melee" }, "self")] } });
+    assert.deepEqual(registry.resolveSync(feint, context("fighter", ["ogre"]), at("success")).changes, [
+        { op: "condition", target: "ogre", slug: "off-guard", value: null, duration: null, scope: { attacker: "fighter", attacks: "melee", uses: 1 } }
+    ]);
+    assert.deepEqual(registry.resolveSync(feint, context("fighter", ["ogre"]), at("criticalFailure")).changes[0], { op: "condition", target: "fighter", slug: "off-guard", value: null, duration: null, scope: { attacker: "ogre", attacks: "melee", uses: null } });
+    const disarm = plan({ criticalSuccess: { ...none, effects: [{ kind: "disarm", what: "drop" }] }, success: { ...none, effects: [{ kind: "disarm", what: "weaken", penalty: 2 }] } });
+    assert.deepEqual(registry.resolveSync(disarm, context("fighter", ["ogre"]), at("success")).changes, [{ op: "effect", target: "ogre", effect: { kind: "disarm", what: "weaken", penalty: 2 } }]);
+    assert.deepEqual(registry.familyFor("check").gaps(disarm), []);
+    const aid = plan({ success: { ...none, effects: [{ kind: "end-condition", slugs: ["dying"], stabilize: true }] } });
+    const stabilized = registry.resolveSync(aid, context("fighter", ["ogre"]), at("success")).changes;
+    assert.deepEqual(stabilized, [{ op: "end", target: "ogre", what: { conditions: ["dying"], from: null, stabilize: true } }]);
+    assert.deepEqual(validateChanges(stabilized), []);
+});

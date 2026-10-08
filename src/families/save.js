@@ -59,7 +59,7 @@ export function saveGaps(plan) {
             gaps.push({ path: `resolution.outcomes.${degree}.${key}`, what: key });
         }
         for (const [index, effect] of (outcome.effects ?? []).entries()) {
-            if (effect?.kind !== "condition" && effect?.kind !== "end-condition") gaps.push({ path: `resolution.outcomes.${degree}.effects.${index}`, what: `effect:${effect?.kind}` });
+            if (!["condition", "end-condition", "disarm"].includes(effect?.kind)) gaps.push({ path: `resolution.outcomes.${degree}.effects.${index}`, what: `effect:${effect?.kind}` });
         }
         for (const [index, entry] of (outcome.noteEffects ?? []).entries()) {
             if (entry?.choiceGroup && !(entry.choiceGroup === "caster-option" && resolution.casterChoice?.kind === "option")) gaps.push({ path: `resolution.outcomes.${degree}.noteEffects.${index}`, what: `choiceGroup:${entry.choiceGroup}` });
@@ -319,8 +319,12 @@ export function* saveSteps(plan, context = {}) {
         for (const effect of outcome.effects ?? []) {
             // recipient "self": the actor (Trip's critical failure, Escape's success).
             const recipient = effect?.recipient === "self" && caster ? idOf(context, caster, -1) : target;
-            if (effect?.kind === "condition") changes.push({ op: "condition", target: recipient, slug: effect.slug, value: Number.isFinite(effect.value) ? effect.value : null, duration: effect.duration ?? null });
-            else if (effect?.kind === "end-condition") changes.push({ op: "end", target: recipient, what: { conditions: effect.slugs ?? [effect.slug], from: effect.recipient === "self" ? target : null } });
+            // A scope (Feint): off-guard only against one creature's attacks, the actor's or the target's.
+            const scope = effect?.scope ? { attacker: effect.scope.against === "target" ? target : caster ? idOf(context, caster, -1) : null, attacks: effect.scope.attacks ?? "any", uses: effect.scope.uses ?? null } : null;
+            if (effect?.kind === "condition") changes.push({ op: "condition", target: recipient, slug: effect.slug, value: Number.isFinite(effect.value) ? effect.value : null, duration: effect.duration ?? null, ...(scope ? { scope } : {}) });
+            else if (effect?.kind === "end-condition") changes.push({ op: "end", target: recipient, what: { conditions: effect.slugs ?? [effect.slug], from: effect.recipient === "self" ? target : null, ...(effect.stabilize ? { stabilize: true } : {}) } });
+            // Disarm: the item falls, or the grip weakens.
+            else if (effect?.kind === "disarm") changes.push({ op: "effect", target: recipient, effect: { kind: "disarm", what: effect.what, penalty: effect.penalty ?? 0 } });
         }
         const movement = outcome.forcedMovement;
         if (movement && ["push", "pull"].includes(movement.kind) && Number.isFinite(movement.distance)) {

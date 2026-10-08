@@ -24,7 +24,7 @@ The `pf2e-resolution-core` Foundry module: the shared plan model, the pure resol
     - `native.damageTypeChoices` become a pre-cast decision per component.
     - `native.byActions` entries can bring their own `outcomes` and `check` (Blazing Bolt).
     - `native.applications` (Bless) become PF2e spell-effect changes on their recipients: self, target, allies or enemies in the area.
-- **Milestone 3:** the `check` family (`src/families/check.js`): the actor's skill against a target's DC (`check.roll: "skill"`, `against: { dc: "target", statistic }`), as basic actions and monster riders use it. Effects can name `recipient: "self"`, and `end-condition` effects end conditions (Escape). It shares the save family's steps.
+- **Milestone 3:** the `check` family (`src/families/check.js`): the actor's skill against a target's DC (`check.roll: "skill"`, `against: { dc: "target", statistic }`), as basic actions and monster riders use it. Effects can name `recipient: "self"`, and `end-condition` effects end conditions (Escape, or stabilize with First Aid). A condition can be scoped to one creature's attacks (Feint), and `disarm` effects knock items away. It shares the save family's steps.
 - A whole-catalogue test resolves every compiled plan of every family over the spell module's real compile (with its native-effect catalog), at every action count and two ranks.
 
 ### Families
