@@ -16,6 +16,7 @@ export { DEGREE_NAMES, degreeIndex, degreeName } from "./model/degrees.js";
 export { CONTEXT_SERVICES, missingServices, createSeededRoller } from "./io.js";
 export { createRegistry } from "./registry.js";
 export { parseDamage, parseDamagePools, addSteps, expectedDamage, rollDamage, formatDamage, formulaVariables } from "./model/dice.js";
+export { parseDisable, routineActions, noMultipleAttackPenalty, mentionsStrike } from "./text/hazard-text.js";
 export { drive, driveSync } from "./drive.js";
 export { planWithActions, planWithVariant, variantFor, mechanicalVariants, healsTarget, hasVoidHealing, nativeOf, healingOf, sharedDamageOf } from "./families/shared.js";
 export { HEALING_KIND, healingFamily, healingSteps, healingGaps } from "./families/healing.js";

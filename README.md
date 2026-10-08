@@ -41,7 +41,7 @@ A family turns a plan into Change ops and typed decisions. It's written as **ste
 
 | Path | Holds |
 |---|---|
-| `src/` | pure code (Node, Web Workers, the simulator): `index.js`, `model/` (including `dice.js`, PF2e damage formulas), `families/`, `registry.js`, `drive.js`, `io.js`, `patch-logic.js`, `text/` |
+| `src/` | pure code (Node, Web Workers, the simulator): `index.js`, `model/` (including `dice.js`, PF2e damage formulas), `families/`, `registry.js`, `drive.js`, `io.js`, `patch-logic.js`, `text/` (shared text readers, including `hazard-text.js`: a hazard's Disable options, routine actions, Strikes without a multiple attack penalty) |
 | `scripts/` | Foundry: `main.js` (the API), `patches.js` (the shared PF2e patches), `runtime-utils.js` |
 | `docs/plan-model.md` | the agreed design |
 | `docs/switch-over.md` | what the spell module changes to use the core |
