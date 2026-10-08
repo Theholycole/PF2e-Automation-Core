@@ -1,199 +1,219 @@
-# Shared plan model: design draft
+# Shared plan model: design draft (version 2)
 
-**Status:** a draft for review by the spell-automation session and the user, written on 2026-10-08. No code yet. Milestone 2 (building the core) waits until the spell module's cleanup is finished and the user picks a start date.
+**Status:** design only, no code. Revised on 2026-10-08 after review by the spell-automation session ("PF2e automation handoff"), whose answers are folded in below and noted as *(review)*. Milestone 2 starts when that session finishes its cleanup and the user picks a date.
 
 **Goal:** one plan format and one resolver for three modules.
 
 - **Spells** (`pf2e-automatic-resolution`) and **abilities** (`pf2e-automatic-ability-resolution`) compile into plans.
-- The **core** (`pf2e-resolution-core`) resolves a plan into a list of changes.
-  - In live play, the Foundry apply layer turns the changes into a confirmation card, then into document updates.
-  - In the Combat Simulator, the same changes are applied to in-memory state, and an AI makes every choice a person would.
+- The **core** (`pf2e-resolution-core`) resolves a plan into **changes** and **decisions**.
+- **In live play,** the Foundry apply layer asks the decisions on a confirmation card, then turns the changes into document and scene updates. Live play stays confirmation-first for everything: every compiled spell plan already has `decisionWindows.applicationRequiresConfirmation: true`, and the user chose the same for abilities.
+- **In the Combat Simulator,** the same changes are applied to in-memory state, and its planner answers the decisions.
 
-## 1. Start from the spell compiler's model
+## 1. The model: version 13 = version 12 + optional fields
 
-The spell compiler's plans (model version 12) already have the right skeleton. A run over 1,994 spells compiled them all, with about 150 resolution kinds:
+The spell compiler's plans (model version 12) are the base. In the current compile of the 1,994 official spells:
+
+- there are **193 resolution kinds**
+- the shared skeleton is only the top level; the real content sits in **per-kind payloads on `resolution`**, with **338 distinct keys** *(review)*
 
 | Plan field | Holds |
 |---|---|
 | `source`, `rank`, `traits` | what the ability is |
 | `activation` | `time` ("1", "2", "1 to 3", reaction, free), traits, requirements, cost |
-| `targeting` | `target`, `range`, `area` (`{ type: "burst", value: 20 }`), actor constraints |
+| `targeting` | `target`, `range`, `area`, actor constraints |
 | `trigger` | `event`, `timing`, `frequency`, `immunity` |
-| `decisionWindows` | when the GM can intervene (before the roll, before applying, rerolls) |
+| `decisionWindows` | GM intervention points and reroll policies |
 | `lifecycle` | duration, sustained, controller, termination |
-| `resolution` | `kind`, `check` (`statistic`, `basic`, `dcSource`), `sharedDamage`, `outcomes` |
-| `resolution.outcomes[degree]` | `damage`, `effects` (e.g. `{ kind: "condition", slug: "frightened", value: 2 }`), `modifiers`, `followUps`, `decisions`, `manualInstructions`, `terminal`, `rawText`, `semanticCoverage` |
-| `automation` | level (automatic, prompted, guided, unsupported), confidence, capabilities |
-| `diagnostics`, `delegations` | what wasn't compiled and why |
+| `resolution` | `kind`, `check`, `sharedDamage`, `outcomes`, and the kind's own payload |
+| `resolution.outcomes[degree]` | `damage`, `effects`, `modifiers`, `followUps`, `manualInstructions`, `terminal`, `rawText`, `semanticCoverage` |
+| `automation`, `diagnostics`, `delegations` | coverage and what wasn't compiled |
 
-**Proposal: the core adopts this model as version 13.** All additions are optional fields, so every version-12 spell plan stays a valid version-13 plan. The spell compiler doesn't need to change to move into the core.
+The most common payload keys are `applications` (1,146 plans), `note` (436), `reminders` (213), `lingering` (133), `incarnate` (86), `dataNotes`, `effectNote`, `temporaryImmunity`, `recipient`, `modes`, `operations`, `heightened`, `casterChoice`, `ritualDegrees`, `afflictionHandoff`, `degreeAdjustment`, `attackAdjustment`, `controls`, `summon` and `storedTrigger`.
 
-## 2. What abilities need that spells don't
+**Rules:**
 
-The census of PF2e's non-spell abilities (`PF2e AUTOMATIC ABILITY RESOLUTION/docs/census.md`) shows the shapes that matter:
+- **No renames** *(review)*. Renaming a version-12 field would mean touching 1,994 official and 227 third-party plans plus their readers and runtimes. Where a cleaner shape helps, the core's **reader normalises** on the way in and the stored plans stay as they are. Example: `check.statistic: "spell-attack"` is read as `{ roll: "attack", statistic: "spell", against: { dc: "target", statistic: "ac" } }`.
+- **Validation is per family** *(review)*. The core validates only the shared skeleton. Each registered family validates its own `resolution` payload.
 
-- **saves:** about 5,400 monster uses
-- **Strike riders:** about 4,500
-- **checks against a target's DC:** about 1,100 monster uses, plus every PC's basic actions
-- **auras**, healing, stances, reactions
+## 2. Additions abilities need
 
-Most fit the model with a few additions.
+These all come from the census of non-spell abilities in `PF2e AUTOMATIC ABILITY RESOLUTION/docs/census.md` (monster use counts):
 
-### 2.1 Checks against a target's DC (Trip, Grapple, Demoralize, Escape)
+- saves: about 5,400
+- Strike riders: about 4,500
+- checks against a target's DC: about 1,100, plus PCs' basic actions
 
-Today `check.statistic` names a save or `spell-attack`, and the DC comes from the source. Abilities often turn that around: the **user rolls a skill against the target's DC**. Proposal: an optional `against` field.
+All the additions below are optional.
+
+### 2.1 Checks: `check.roll` and `check.against`
 
 ```js
 check: {
-  roll: "skill",                    // "save" (default, today's meaning) | "skill" | "attack" | "perception" | "flat"
-  statistic: "athletics",           // or ["acrobatics", "athletics"] when the user picks the better one (Escape)
-  against: { dc: "target", statistic: "reflex" },  // Trip: Athletics vs the target's Reflex DC
-  // other forms: { dc: "fixed", value: 15 } (Battle Medicine), { dc: "source", statistic: "class" }
-  //              { dc: "grabber", statistic: "athletics" } (Escape against whoever grabbed you)
+  roll: "save" | "skill" | "attack" | "perception" | "flat" | "counteract",
+  statistic: "athletics" | ["acrobatics", "athletics"],   // a list: the roller picks the better one (Escape)
+  against: { dc: "target", statistic: "reflex" }           // Trip
+         // { dc: "fixed", value: 15 }                     Battle Medicine
+         // { dc: "source", statistic: "class" }           a monster's ability DC
+         // { dc: "grabber", statistic: "athletics" }      Escape
+         // { dc: "effect", rank }                         counteract (see below)
+  perTarget: true                                          // one roll, a degree per target
 }
 ```
 
-`outcomes` stay keyed by degree, from the roller's side, as they are for spell attacks.
+Outcomes stay keyed from the roller's side, as spell attacks already are. Three cases spell plans already need *(review)*:
 
-### 2.2 Strike riders (Grab, Knockdown, Push, Rend, Power Attack's extra dice)
+- **One roll against several targets' DCs, with a degree per target** (`perTarget: true`). Example: Liar's Lexicon, Deception against every observer's Perception DC.
+- **A spell attack against a save DC instead of AC.** A spellshape rider switches `against.statistic`.
+- **Counteract checks.** The degree comes from the counteract rank against the target's rank, not only from beating the DC. This uses `roll: "counteract"`, `against: { dc: "effect", rank }`, and a shared counteract rule in the core.
 
-Riders hang off a Strike instead of being used on their own. Proposal: a `trigger` event plus a link to the Strikes they ride on.
+### 2.2 Strike riders
 
 ```js
-trigger: {
-  event: "strike",                  // new: fires on the user's Strike
-  on: ["success", "criticalSuccess"], // Strike degrees that set it off
-  strikes: { slugs: ["jaws"] },     // or { attackEffect: "grab" } to follow PF2e's melee attackEffects
-  cost: "free"                      // Improved Grab; "action" for Grab (spend 1 action after the hit)
-}
-resolution: { kind: "rider", outcomes: { success: { effects: [{ kind: "condition", slug: "grabbed", target: "struck" }] } } }
+trigger: { event: "strike", on: ["success", "criticalSuccess"], strikes: { attackEffect: "grab" } | { slugs: ["jaws"] }, cost: "action" | "free" }
+resolution: { kind: "rider", requires?: { strikesThisTurn: { slugs: ["claw"], hits: 2 } }, outcomes: { … } }
 ```
 
-Rend ("hit with two claws in one turn") needs a turn memory, so it gets a small `requires: { strikesThisTurn: { slugs: ["claw"], hits: 2 } }`.
+Covers Grab, Improved Grab, Knockdown, Push and Rend (the `requires` part is Rend's "hit with two claws this turn").
 
-### 2.3 Action sequences and modified Strikes (Sudden Charge, Double Slice, Power Attack)
-
-Many PC feats are "do these basic actions, with these changes". Proposal: `resolution.kind: "action-sequence"` with steps the resolver already knows.
+### 2.3 Action sequences
 
 ```js
-resolution: {
-  kind: "action-sequence",
-  steps: [
-    { do: "stride", times: 2 },
-    { do: "strike", modifiers: [], mapCountsAs: 1 }
-  ]
-}
+resolution: { kind: "action-sequence", steps: [{ do: "stride", times: 2 }, { do: "strike", mapCountsAs: 1 }] }
 // Power Attack: [{ do: "strike", extraDice: 1, mapCountsAs: 2 }]
-// Double Slice: [{ do: "strike", hand: "main" }, { do: "strike", hand: "off", mapSharedPenalty: true }]
 ```
 
-The simulator already has Strike and Stride built in, so these become cheap once the step vocabulary is shared.
+Covers Sudden Charge, Power Attack and Double Slice.
 
-### 2.4 Limits: frequency and per-target immunity
-
-`trigger.frequency` and `trigger.immunity` exist already. Proposal: give them a structured form, keeping the text alongside.
+### 2.4 Structured limits
 
 ```js
-frequency: { max: 1, per: "round" | "turn" | "minute" | "10-minutes" | "hour" | "day" | "encounter", raw: "once per round" }
-immunity:  { scope: "target", duration: "10-minutes", raw: "…temporarily immune for 10 minutes" }  // Demoralize, Battle Medicine (1 day)
+frequency: { max: 1, per: "round" | "turn" | "minute" | "10-minutes" | "hour" | "day" | "encounter", raw }
+immunity:  { scope: "target", duration: "10-minutes", raw }
 ```
 
-### 2.5 Stances and auras
+The text stays alongside the structured form.
 
-- **Stances:** `lifecycle.stance: true`. Entering a stance ends the user's other stances, and the stance's Effect carries its rule elements.
-- **Auras:** `targeting.area: { type: "emanation", value: 30 }` plus `trigger.event: "aura"` with `when: "enter" | "start-turn" | "end-turn"` and the existing `check`/`outcomes`. Frightful Presence: Will save against the source's DC on entering or starting a turn in it; on failure, frightened; immunity for 1 minute.
+### 2.5 Stances, auras and reactions
 
-### 2.6 Reactions
+- **Stances:** `lifecycle.stance: true`. Entering one ends the user's other stances.
+- **Auras:** `targeting.area: { type: "emanation", value }` plus `trigger: { event: "aura", when: "enter" | "start-turn" | "end-turn" }`. Example: Frightful Presence.
+- **Reactions:** `activation.time: "reaction"` plus `trigger: { event: "reaction", when: "targeted-by-attack" | "hit" | "reduced-to-0-hp" | "ally-hit" | "enemy-moves-within-reach", raw }`.
 
-`activation.time: "reaction"` plus a structured trigger:
+### 2.6 Healing outside spells
+
+No new fields. Battle Medicine is a fixed-DC Medicine check with a 1-day per-target immunity. Potions are an Interact action with healing.
+
+## 3. Decisions are typed and phased
+
+`outcomes[degree].decisions` is empty in every compiled plan *(review)*. Decisions actually live in several places, at different moments *(review)*:
+
+| Phase | Where they are today | Examples |
+|---|---|---|
+| `pre-cast` | runtime prompts; `variantPlans`; `resolution.casterChoice` (32 plans), `modes` (35), `summon`; effect-choice forms; spellshape and catalyst riders | action count, rank, targets, area placement, damage type, option, which creature, Illusory Creature size, Repulsion radius |
+| `pre-roll` | `resolution.attackAdjustment` (17) | a GM question with valued choices that sets a modifier: Charm +4, Phase Bolt cover |
+| `post-roll` | `resolution.degreeAdjustment` (21); `decisionWindows` reroll policies | "Was the creature flying?" with a degree map; rerolls |
+| `apply` | "is it affected" confirmations | per-target confirmation |
+| `ongoing` | `resolution.controls` (17); Sustain and `repeatable`; `review-targets` and `gm-hazard` obligations; stored-trigger results | GM buttons; Sustain choices; Mirror Image hit, miss or critical |
+
+So the resolver yields **typed decisions**:
 
 ```js
-trigger: { event: "reaction", when: "targeted-by-attack" | "hit" | "reduced-to-0-hp" | "ally-hit" | "enemy-moves-within-reach", raw: "…" }
+Decision = { id, phase, question, options: [{ value, label, effect? }], default?, audience: "gm" | "owner" }
 ```
 
-Examples: Nimble Dodge (+2 AC against the triggering attack), Ferocity (stay at 1 HP), Shield Block.
+- `id` is stable, so the simulator answers the same question the same way, and the live card can prompt for it.
+- **Live play:** the apply layer asks them on the card, in phase order.
+- **Simulator:** the planner answers them, scoring options where an `effect` says what each does, otherwise taking the default.
 
-### 2.7 Healing outside spells
-
-These need nothing new:
-
-- **Battle Medicine:** `check: { roll: "skill", statistic: "medicine", against: { dc: "fixed", value: 15 } }`, plus `immunity: { scope: "target", duration: "day" }`, with outcomes that carry healing.
-- **Potions:** `activation.time: "1"` (Interact), with an outcome-free `healing` resolution.
-
-## 3. The resolver contract
-
-The core's pure layer turns a plan into changes and never touches Foundry:
+## 4. The resolver contract
 
 ```js
-resolve(plan, context, { rolls, choose }) → { degree, changes: Change[], pendingDecisions: Decision[] }
+resolve(plan, context, io) → { degrees, changes: Change[], decisions: Decision[], records: OngoingRecord[] }
+resolveEvent(record, event, context, io) → { changes, decisions, record }   // ongoing state machines (review)
 
-// context: the user, the targets and the situation as plain data (the simulator's snapshot
-//          format, or an adapter over Foundry documents)
-// rolls:   pre-rolled or rolled through a supplied function, so the simulator can seed them
-// choose:  answers decisions (live: a chat-card prompt; simulator: the planner)
+io.roll(statistic, { modifiers, rollOptions, against })   // a roller service, not a list of numbers (review)
+io.choose(decision) → value
+```
 
+**Rolls.** `io.roll` takes modifiers and roll options and returns a degree. The live roller routes through PF2e's `Statistic.roll`, including the d20 clamp, fortune and misfortune, rerolls and degree maps. The simulator supplies a seeded roller with the same interface.
+
+**Context services.** Pure code can't read Foundry, so these are services on `context` *(review)*:
+
+- `context.statistic(actor, slug)`: modifiers and roll options
+- `context.iwr(actor)`: immunities, weaknesses, resistances, applied the way PF2e's `applyDamage` does
+- `context.distance(a, b)`, `context.inArea(actor, area)`, `context.blocked(from, to)`: canvas geometry, including walls stopping forced movement
+
+The simulator implements them on its range bands. The live layer implements them on the canvas.
+
+**Change ops.** Extended with the cases live runtimes need *(review)*:
+
+```js
 Change =
-  | { op: "damage", target, instances: [{ type, amount, persistent, precision }] }
-  | { op: "heal", target, amount }
-  | { op: "condition", target, slug, value, duration }
-  | { op: "effect", target, effect }        // a PF2e Effect item, by reference or generated
+  | { op: "damage", target, instances }            | { op: "heal", target, amount }
+  | { op: "tempHp", target, amount }                | { op: "condition", target, slug, value, duration }
+  | { op: "effect", target, effect }                | { op: "end", target, what }          // end an effect or spell (counteract, dismiss)
+  | { op: "item", action: "create" | "update" | "delete", target, data }   // incl. rule patches, duration swaps, conjured items
   | { op: "move", target, kind: "push" | "pull" | "stride", distance }
-  | { op: "resource", target, key, delta }  // spell slots, focus points, uses per day
-  | { op: "note", audience: "gm" | "all", text }
+  | { op: "teleport", target, to }                  | { op: "elevate", target, delta }
+  | { op: "size", target, size }                    | { op: "ownership", target, owner }   // minion control
+  | { op: "spawn", what: "token" | "actor", data }  // summons, conjured creatures, illusions, thralls
+  | { op: "scene", what: "region" | "wall" | "light", action, data }   // areas, terrain, clouds, Wall of Force
+  | { op: "ongoing", action: "start" | "advance" | "end", record }
+  | { op: "followUp", plan, when: "now" | event }   // a follow-up card whose button starts another resolution
+  | { op: "affliction", target, data }              // hand-off to Pseudo Afflictions
+  | { op: "resource", target, key, delta }          | { op: "note", audience, text }
 ```
 
-- **Live play:** the apply layer shows the card (confirmation-first for everything, as the user decided for the ability module), then turns each change into document updates.
-- **Simulator:** each change is applied to its state. Anything that can only be a note is counted as a gap.
+The simulator applies what it can model (damage, healing, temporary HP, conditions, effects it understands, movement in bands, ending effects, resources) and counts the rest as gaps. That keeps the gap report honest.
 
-## 4. Registry
-
-Content modules register families instead of depending on each other:
+## 5. Registry
 
 ```js
-core.registerFamily({
-  kind: "rider",            // resolution.kind it handles
-  module: "pf2e-automatic-ability-resolution",
-  resolve(plan, context, io) { … },  // pure
-  simulate?: { … }          // optional extras for the simulator (e.g. how to value it when planning)
-});
-core.planFor(item)          // a plan for an item from whichever module compiled it (cached)
+core.registerFamily({ kind, module, validate(payload), resolve(plan, context, io), resolveEvent?, simulate? })
+core.planFor(item)   // the compiled plan from whichever module owns the item (cached)
 ```
 
-The simulator asks `core.planFor(item)` for every ability on a creature. Anything without a plan or a registered family stays a gap, as now.
+## 6. What the core owns
 
-## 5. What the core owns from day one
+**From day one: anything that patches a shared prototype or claims a shared message** *(review)*:
 
-These come from the spell-automation session. If two modules each kept a copy, PF2e functions would be wrapped twice and hooks would fire twice.
+1. the `Actor.prototype.applyDamage` wrapper (`installDamageTypeMemory`, `scripts/item-spellshape-runtime.js`) and its preCreateChatMessage `damageSource` stamp
+2. `ItemPF2e.prototype.prepareRuleElements` (`scripts/text-rules.js`)
+3. `CheckRoll.prototype.evaluate` (`scripts/d20-clamp.js`): fortune and minimum-roll abilities in the ability module would collide with it
+4. the `_getTerrainEffects` / modifyMovementCost patch (`patchSelectiveTerrain`, `scripts/main.js`): per-creature difficult terrain, which the ability module also needs
+5. the conventions: only the active GM acts on hooks; chat-card handlers skip messages with `flags.pf2e.context.type`; hooks that fire on every Combat update must be cheap or guarded (one hook cost 0.5–1.3 s per update in `pftest`)
 
-- the `applyDamage` wrapper (damage types, the damage's item and actor, `damageSource` on PF2e's damage-taken message, spell-shield marking on Shield Block)
-- the text-rules wrapper of `ItemPF2e#prepareRuleElements`
-- damage receipts, forced movement, condition timing
-- the ongoing journal manager and its single-coordinator queue
-- the convention that chat-card handlers skip messages with `flags.pf2e.context.type`
+**Later:**
 
-One more from the simulator's own testing: hooks that run on every Combat update must be cheap or guarded. Combat updates happen on every turn change, and in `pftest` one hook made each update cost 0.5–1.3 s.
+- **As they're needed** (they patch nothing and can be imported until then): damage receipts, forced movement, condition timing.
+- **Before the ability module's aura family:** the ongoing journal manager and its single-coordinator queue. There must be exactly one.
+- **Eventually:** a single HP-change pipeline, once the ability module adds preUpdateActor HP interceptors of its own, so their order is defined. The spell module's existing ones (halved healing, no healing, covenant, HP pact) stay there until then.
+- **First inhabitants:** the helpers the cleanup is collecting into `scripts/runtime-utils.js` and `src/compiler/text-patterns.js`.
 
-## 6. Order of work once milestone 2 starts
+## 7. Order of work once milestone 2 starts
 
-1. Create the core module with the version-13 model (version 12 plus the optional fields above), a validator, the registry and the change format. No behaviour moves yet.
-2. Move the shared Foundry pieces from section 5 into the core, with the spell module depending on it. That module's tests must stay green.
-3. Move families one at a time, in the order the simulator needs them, each split into a pure resolver plus the apply layer (the `basic-save-core` pattern):
-   1. basic saves and spell attacks
-   2. healing
+1. **Core module scaffold:**
+   - the skeleton validator and the reader normalisation
+   - the registry
+   - the Decision, Change and OngoingRecord formats, and the `io` and context-service interfaces
+   - `runtime-utils.js` and `text-patterns.js` as its first code
+2. **Day-one ownership:** move the shared prototype patches and conventions from section 6 into the core, with the spell module depending on it. That module's tests and a live regression run must stay green.
+3. **Families one at a time, as real splits** *(review)*. The spell runtimes are imperative executors today (EffectRuntime alone has about 370 methods), so each family is split into a pure resolver plus the apply layer, copying `basic-save-core.js`. Order, driven by the simulator:
+   1. basic saves and spell attacks (already split)
+   2. healing and temporary HP
    3. condition riders
-   4. the most common gaps after that, from the simulator's gap report
-4. The simulator switches its gap list from "has a spell" to "has no registered family for this plan".
+   4. then the most common gaps in the simulator's gap report
+4. **Simulator switch:** a creature's ability counts as a gap only when it has no plan or its plan's kind has no registered family.
 
-## 7. Questions for review
+## 8. Settled
 
-For the spell-automation session:
+- Version 13 = version 12 + optional fields, normalised in the reader, with no renames.
+- `check.roll` and `check.against`, plus per-target degrees, defence switching and counteract.
+- Decisions are typed and phased; the resolver has `resolveEvent` for ongoing records; rolls go through a roller service; geometry and IWR come through context services.
+- The Change ops list above, and the day-one ownership list.
+- Live play stays confirmation-first for spells and abilities.
 
-1. Is version 13 as "version 12 plus optional fields" right, or are there version-12 fields you'd rather rename or drop while it's cheap?
-2. `check.statistic: "spell-attack"` already reverses roller and DC for spell attacks. Is `check.roll` plus `check.against` the right generalisation, or would you model it differently?
-3. Where do decisions live today: only in `outcomes[degree].decisions`, or also before the roll (choosing targets, variants, rank)? The `choose` interface has to cover all of them.
-4. For section 5, which hooks must the core own on day one, and which can move later?
-5. Is anything in the version-12 runtimes impossible to express as `Change` ops (something that must touch Foundry mid-resolution)?
+## 9. Still open
 
-For the user:
-
-6. Is confirmation-first for everything also right for spells once they share the core? It's the spell module's current behaviour, so the expected answer is yes.
+- Exactly what the context services return: the live canvas has precise geometry, and the simulator only has bands. An agreed lowest common denominator (distance in feet, inside an area or not, path blocked or not) is probably enough. To agree at milestone 2's start.
+- How `followUp` cards and `ongoing` records behave in the simulator: probably resolved on the matching simulated event (start of turn, Sustain), with anything else counted as a gap.
