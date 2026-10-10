@@ -241,3 +241,29 @@ test("the sync driver: the planner can force a degree and use average damage; a 
     assert.deepEqual(forced("success").changes.map((change) => change.instances[0].amount), [10, 10]);
     assert.throws(() => resolveSaveSync(FIREBALL, context, { roll: async () => ({ degree: "failure" }) }), /use drive/);
 });
+
+test("persistent damage in a basic save's shared damage says when the save halved or doubled it", () => {
+    const registry = createRegistry();
+    for (const family of CORE_FAMILIES) registry.registerFamily(family);
+    const plan = {
+        modelVersion: 13,
+        source: { name: "Searing Spray", type: "action" },
+        rank: 1,
+        traits: [],
+        activation: { time: "2", traits: [] },
+        automation: { level: "automatic" },
+        targeting: { target: "1 creature", range: "touch", area: null },
+        trigger: { event: "use" },
+        resolution: {
+            kind: "save",
+            check: { roll: "save", statistic: "reflex", basic: true, against: { dc: "fixed", value: 20 } },
+            sharedDamage: { rollOnce: true, components: [{ id: "0", formula: "2d6[fire],1d4[persistent,fire]", type: null, category: null }] },
+            outcomes: { criticalSuccess: { damage: { mode: "shared", multiplier: 0, sourceComponentIds: [] }, effects: [] }, success: { damage: { mode: "shared", multiplier: 0.5, sourceComponentIds: ["0"] }, effects: [] }, failure: { damage: { mode: "shared", multiplier: 1, sourceComponentIds: ["0"] }, effects: [] }, criticalFailure: { damage: { mode: "shared", multiplier: 2, sourceComponentIds: ["0"] }, effects: [] } }
+        }
+    };
+    const context = { caster: { id: "m", side: "foes" }, targets: [{ id: "t", side: "party" }], statistic: () => ({ modifier: 10 }), allied: () => false };
+    const persistent = (degree) => registry.resolveSync(plan, context, { roll: () => ({ degree }) }).changes.find((change) => change.slug === "persistent-damage").damage;
+    assert.equal(persistent("failure").multiplier, undefined);
+    assert.equal(persistent("criticalFailure").multiplier, 2);
+    assert.deepEqual(persistent("failure").dice.map((term) => `${term.count}d${term.die}`), ["1d4"]);
+});

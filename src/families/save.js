@@ -146,13 +146,15 @@ function statisticOf(context, actor, slug) {
     return value;
 }
 
-function persistentChange(target, instance, amount) {
+// multiplier: a basic save's half or double on the rolled amount (absent when the dice stand as rolled, so a
+// runtime can keep the dice for the persistent damage's later rounds).
+function persistentChange(target, instance, amount, multiplier = 1) {
     return {
         op: "condition",
         target,
         slug: "persistent-damage",
         value: null,
-        damage: { type: instance.type, dice: instance.dice, constant: instance.constant, amount }
+        damage: { type: instance.type, dice: instance.dice, constant: instance.constant, amount, ...(multiplier !== 1 ? { multiplier } : {}) }
     };
 }
 
@@ -161,8 +163,8 @@ function persistentChange(target, instance, amount) {
 function damageChanges(target, rolled) {
     const changes = [];
     const immediate = [];
-    for (const { instance, amount } of rolled) {
-        if (instance.category === "persistent") changes.push(persistentChange(target, instance, amount));
+    for (const { instance, amount, multiplier } of rolled) {
+        if (instance.category === "persistent") changes.push(persistentChange(target, instance, amount, multiplier));
         else if (amount > 0) immediate.push({ type: instance.type, category: instance.category, amount });
     }
     if (immediate.length) changes.unshift({ op: "damage", target, instances: immediate });
@@ -311,7 +313,7 @@ export function* saveSteps(plan, context = {}) {
             const amounts = sharedOnce ?? (yield* sharedRoll());
             for (const id of shared.sourceComponentIds ?? []) {
                 const multiplier = shared.componentMultipliers?.[id] ?? shared.multiplier ?? damage.multiplier ?? 1;
-                for (const { instance, amount } of amounts.get(id) ?? []) rolled.push({ instance, amount: Math.floor(amount * multiplier) });
+                for (const { instance, amount } of amounts.get(id) ?? []) rolled.push({ instance, amount: Math.floor(amount * multiplier), multiplier });
             }
         }
         if (damage.mode === "mixed" || damage.mode === "formulas") {
