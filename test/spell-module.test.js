@@ -4,12 +4,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { validateSkeleton, readPlan, resolveSave, saveGaps, createSeededRoller, validateChanges, createRegistry, CORE_FAMILIES } from "../src/index.js";
 import * as coreTextPatterns from "../src/text/text-patterns.js";
 
-const SPELL_MODULE = "/home/theholycole/Documents/ChatGPT/PF2e AUTOMATIC SPELL RESOLUTION";
-const LEVELDB = "/home/theholycole/Documents/ChatGPT/PF2e AUTOMATIC ABILITY RESOLUTION/tools/leveldb.mjs";
+// The spell and ability modules' folders sit beside this one.
+const SPELL_MODULE = fileURLToPath(new URL("../../PF2e AUTOMATIC SPELL RESOLUTION", import.meta.url));
+const LEVELDB = fileURLToPath(new URL("../../PF2e AUTOMATIC ABILITY RESOLUTION/tools/leveldb.mjs", import.meta.url));
 const SPELLS_PACK = `${process.env.HOME}/.local/share/FoundryVTT/Data/systems/pf2e/packs/spells`;
 const RATCHET = 431;
 const EFFECTS_PACK = `${process.env.HOME}/.local/share/FoundryVTT/Data/systems/pf2e/packs/spell-effects`;

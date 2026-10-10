@@ -4,7 +4,7 @@ For the session that owns `pf2e-automatic-resolution`. The core is built and tes
 
 ## The core
 
-- **Module id:** `pf2e-resolution-core`. Folder `/home/theholycole/Documents/ChatGPT/PF2e RESOLUTION CORE`, linked as:
+- **Module id:** `pf2e-resolution-core`. Folder `PF2e RESOLUTION CORE` (beside the other modules' folders), linked as:
   - `~/.local/share/FoundryVTT/Data/modules/pf2e-resolution-core`, for Foundry
   - `~/Documents/ChatGPT/pf2e-resolution-core`, a sibling of the spell module's folder, so the same relative import resolves both in Node and in Foundry (`/modules/pf2e-resolution-core/...`): `../../pf2e-resolution-core/...` from `scripts/`, and `../../../pf2e-resolution-core/...` from `src/compiler/` *(corrected after the spell session's review)*
 - **API:** `game.modules.get("pf2e-resolution-core").api` exists from the core's `init` (it loads first as a dependency). The `pf2eResolutionCoreReady` hook also fires with it.

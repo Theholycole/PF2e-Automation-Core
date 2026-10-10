@@ -2,6 +2,18 @@
 
 The `pf2e-resolution-core` Foundry module: the shared plan model, the pure resolver registry, the shared helpers, and the one copy of each shared PF2e patch. It serves PF2e Automatic Spell Resolution, PF2e Automatic Ability Resolution, PF2e Automatic Kineticist Resolution and the PF2e Combat Simulator.
 
+## Install
+
+It's a library: on its own it adds nothing to the game. The modules that need it (PF2e Automatic Spell Resolution and the others above) offer to install it with them.
+
+To install it yourself, in Foundry go to **Add-on Modules → Install Module**, paste this manifest URL and click **Install**:
+
+```
+https://github.com/Theholycole/PF2e-Automation-Core/releases/latest/download/module.json
+```
+
+Foundry 14 and the PF2e system 8.5 or later. MIT licensed (see [LICENSE](LICENSE)); the Pathfinder rules text it reads comes from the PF2e system under Paizo's ORC license.
+
 **Status (2026-10-08): milestones 2 and 3 under way.** 54 Node tests pass.
 
 - **Step 1** is done: the version-13 model, outline check and reader, typed decisions, change ops, registry, roller and context contracts.
