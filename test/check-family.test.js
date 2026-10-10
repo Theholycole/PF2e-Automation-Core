@@ -81,3 +81,23 @@ test("Feint, Disarm and First Aid: off-guard to one creature's attacks, a disarm
     assert.deepEqual(stabilized, [{ op: "end", target: "ogre", what: { conditions: ["dying"], from: null, stabilize: true } }]);
     assert.deepEqual(validateChanges(stabilized), []);
 });
+
+test("an automatic check rolls nothing: every target gets the success row (2026-10-10)", () => {
+    const registry = createRegistry();
+    for (const family of CORE_FAMILIES) registry.registerFamily(family);
+    const burn = {
+        modelVersion: 13, source: { name: "Burn Alive" }, rank: 1, traits: [],
+        resolution: {
+            kind: "check",
+            check: { roll: "automatic", statistic: "automatic" },
+            sharedDamage: { rollOnce: true, components: [{ id: "0", formula: "3d8[fire],1d8[persistent,fire]" }] },
+            outcomes: { criticalSuccess: none, success: { damage: { mode: "shared", multiplier: 1, sourceComponentIds: ["0"] }, effects: [prone()] }, failure: none, criticalFailure: none }
+        }
+    };
+    let rolled = 0;
+    const result = registry.resolveSync(burn, { caster: { id: "m" }, targets: [{ id: "a" }, { id: "b" }], statistic: () => ({ modifier: 0, dc: 10 }) }, { roll: () => { rolled++; return { degree: "failure" }; }, damage: () => 9 });
+    assert.equal(rolled, 0, "no roll asked for");
+    assert.deepEqual(result.changes.filter((change) => change.op === "condition").map((change) => [change.target, change.slug]), [["a", "persistent-damage"], ["a", "prone"], ["b", "persistent-damage"], ["b", "prone"]]);
+    assert.ok(result.changes.some((change) => change.op === "damage" && change.target === "b"));
+    assert.deepEqual(validateChanges(result.changes), []);
+});

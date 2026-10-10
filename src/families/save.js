@@ -259,6 +259,9 @@ export function* saveSteps(plan, context = {}) {
             const penalty = check.sharedMultipleAttackPenalty ? -5 * Math.min(index, 2) : 0;
             // Phase Bolt's answer is the AC bonus it removes: a bonus to the attack.
             roll = yield { type: "roll", statistic: check.statistic, options: { actor: caster, target: actor, modifier: attacker.modifier + penalty + adjustment, dc: defence.dc } };
+        } else if (check.roll === "automatic") {
+            // No roll at all ("The target takes 3d8 fire damage", 2026-10-10): every target's result is the success row.
+            roll = { degree: "success", total: null, natural: null };
         } else if (check.roll === "skill" || check.roll === "perception") {
             // The actor's skill against the target's DC (Trip: Athletics against Reflex DC).
             // A list of statistics (Escape): the actor's best.

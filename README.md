@@ -36,7 +36,7 @@ Foundry 14 and the PF2e system 8.5 or later. MIT licensed (see [LICENSE](LICENSE
     - `native.damageTypeChoices` become a pre-cast decision per component.
     - `native.byActions` entries can bring their own `outcomes` and `check` (Blazing Bolt).
     - `native.applications` (Bless) become PF2e spell-effect changes on their recipients: self, target, allies or enemies in the area.
-- **Milestone 3:** the `check` family (`src/families/check.js`): the actor's skill against a target's DC (`check.roll: "skill"`, `against: { dc: "target", statistic }`), as basic actions and monster riders use it. Effects can name `recipient: "self"`, and `end-condition` effects end conditions (Escape, or stabilize with First Aid). A condition can be scoped to one creature's attacks (Feint), and `disarm` effects knock items away. It shares the save family's steps.
+- **Milestone 3:** the `check` family (`src/families/check.js`): the actor's skill against a target's DC (`check.roll: "skill"`, `against: { dc: "target", statistic }`), as basic actions and monster riders use it. Effects can name `recipient: "self"`, and `end-condition` effects end conditions (Escape, or stabilize with First Aid). A condition can be scoped to one creature's attacks (Feint), and `disarm` effects knock items away. It shares the save family's steps. A `check.roll` of `"automatic"` (2026-10-10) rolls nothing: every target gets the success row ("The target takes 3d8 fire damage").
 - A whole-catalogue test resolves every compiled plan of every family over the spell module's real compile (with its native-effect catalog), at every action count and two ranks.
 
 ### Families
