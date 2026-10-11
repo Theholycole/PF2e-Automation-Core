@@ -338,8 +338,9 @@ export function* saveSteps(plan, context = {}) {
             // A scope (Feint): off-guard only against one creature's attacks, the actor's or the target's.
             const scope = effect?.scope ? { attacker: effect.scope.against === "target" ? target : caster ? idOf(context, caster, -1) : null, attacks: effect.scope.attacks ?? "any", uses: effect.scope.uses ?? null } : null;
             // (stack, 2026-10-11: "the condition value increases by 1 (to a maximum of 4)" on a later failure — { by, max? }, for the runtime
-            // to add to a value the creature already has.)
-            if (effect?.kind === "condition") changes.push({ op: "condition", target: recipient, slug: effect.slug, value: Number.isFinite(effect.value) ? effect.value : null, duration: effect.duration ?? null, ...(scope ? { scope } : {}), ...(effect.stack ? { stack: { by: Number(effect.stack.by) || 1, ...(Number.isFinite(effect.stack.max) ? { max: effect.stack.max } : {}) } } : {}) });
+            // to add to a value the creature already has; escalate: "if already slowed, … Petrified permanently" — { if, slug, value,
+            // duration }, the runtime's to apply when the creature already has the first.)
+            if (effect?.kind === "condition") changes.push({ op: "condition", target: recipient, slug: effect.slug, value: Number.isFinite(effect.value) ? effect.value : null, duration: effect.duration ?? null, ...(scope ? { scope } : {}), ...(effect.stack ? { stack: { by: Number(effect.stack.by) || 1, ...(Number.isFinite(effect.stack.max) ? { max: effect.stack.max } : {}) } } : {}), ...(effect.escalate?.slug ? { escalate: { if: effect.escalate.if, slug: effect.escalate.slug, value: Number.isFinite(effect.escalate.value) ? effect.escalate.value : null, duration: effect.escalate.duration ?? null } } : {}) });
             else if (effect?.kind === "end-condition") changes.push({ op: "end", target: recipient, what: { conditions: effect.slugs ?? [effect.slug], from: effect.recipient === "self" ? target : null, ...(effect.stabilize ? { stabilize: true } : {}) } });
             // Temporary Hit Points ("gains 40 temporary Hit Points that last for 1 minute", "6d8 temporary Hit Points"): a fixed
             // amount, or the formula rolled; duration as a condition's, for the runtime.

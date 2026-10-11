@@ -285,3 +285,14 @@ test("a condition that grows with each later failure carries its stack to the ru
     ]);
     assert.deepEqual(validateChanges(result.changes), []);
 });
+
+test("a worse condition for a creature that already has the first carries to the runtime (2026-10-11)", async () => {
+    const gaze = plan("Test Gaze", 1, {
+        check: { statistic: "fortitude", basic: false, dcSource: "source-actor" },
+        sharedDamage: null,
+        outcomes: degreeRows({ failure: { effects: [{ ...condition("slowed", 1), escalate: { if: "slowed", slug: "petrified", value: null, duration: null } }] } })
+    });
+    const { context, io } = scene({ degrees: { a: "failure" } });
+    const result = await resolveSave(gaze, context, io);
+    assert.deepEqual(result.changes, [{ op: "condition", target: "a", slug: "slowed", value: 1, duration: null, escalate: { if: "slowed", slug: "petrified", value: null, duration: null } }]);
+});
