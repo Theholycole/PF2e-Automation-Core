@@ -267,3 +267,21 @@ test("persistent damage in a basic save's shared damage says when the save halve
     assert.equal(persistent("criticalFailure").multiplier, 2);
     assert.deepEqual(persistent("failure").dice.map((term) => `${term.count}d${term.die}`), ["1d4"]);
 });
+
+test("a condition that grows with each later failure carries its stack to the runtime (2026-10-11)", async () => {
+    const caress = plan("Test Caress", 1, {
+        check: { statistic: "will", basic: false, dcSource: "source-actor" },
+        sharedDamage: null,
+        outcomes: degreeRows({
+            failure: { effects: [{ ...condition("stupefied", 1), stack: { by: 1, max: 4 } }] },
+            criticalFailure: { effects: [{ ...condition("stupefied", 2), stack: { by: 2, max: 4 } }] }
+        })
+    });
+    const { context, io } = scene({ degrees: { a: "failure", b: "criticalFailure" } });
+    const result = await resolveSave(caress, context, io);
+    assert.deepEqual(result.changes, [
+        { op: "condition", target: "a", slug: "stupefied", value: 1, duration: null, stack: { by: 1, max: 4 } },
+        { op: "condition", target: "b", slug: "stupefied", value: 2, duration: null, stack: { by: 2, max: 4 } }
+    ]);
+    assert.deepEqual(validateChanges(result.changes), []);
+});
