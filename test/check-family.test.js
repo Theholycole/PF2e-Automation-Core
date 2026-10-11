@@ -117,3 +117,16 @@ test("temporary Hit Points: a fixed amount, or the formula rolled (2026-10-10)",
     const rolled = registry.resolveSync(plan({ kind: "temp-hp", formula: "6d8", duration: minute }), context, { roll: () => ({ degree: "success" }), damage: () => 27 }).changes;
     assert.equal(rolled.find((change) => change.op === "tempHp").amount, 27);
 });
+
+test("healing the creature, and temporary Hit Points equal to the damage dealt (2026-10-10)", () => {
+    const registry = createRegistry();
+    for (const family of CORE_FAMILIES) registry.registerFamily(family);
+    const drain = {
+        modelVersion: 13, source: { name: "Blood Drain" }, rank: 1, traits: [],
+        resolution: { kind: "check", check: { roll: "automatic", statistic: "automatic" }, sharedDamage: null, outcomes: { criticalSuccess: none, success: { damage: { mode: "formulas", formulas: [{ formula: "4d6[untyped]" }], rollScope: "outcome" }, effects: [{ kind: "temp-hp", fromDamage: true, recipient: "self" }, { kind: "heal", amount: 8, excessAsTemp: true, recipient: "self" }] }, failure: none, criticalFailure: none } }
+    };
+    const context = { caster: { id: "leech" }, targets: [{ id: "victim" }], statistic: () => ({ modifier: 0, dc: 10 }) };
+    const changes = registry.resolveSync(drain, context, { roll: () => ({ degree: "success" }), damage: () => 14 }).changes;
+    assert.deepEqual(changes.filter((change) => change.op !== "damage"), [{ op: "tempHp", target: "leech", amount: 14, duration: null }, { op: "heal", target: "leech", amount: 8, excessAsTemp: true }]);
+    assert.deepEqual(validateChanges(changes), []);
+});

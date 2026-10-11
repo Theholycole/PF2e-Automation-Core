@@ -68,7 +68,7 @@ export function saveGaps(plan) {
             gaps.push({ path: `resolution.outcomes.${degree}.${key}`, what: key });
         }
         for (const [index, effect] of (outcome.effects ?? []).entries()) {
-            if (effect?.kind !== "condition" && effect?.kind !== "end-condition" && effect?.kind !== "temp-hp" && !PASSED_EFFECTS.has(effect?.kind)) gaps.push({ path: `resolution.outcomes.${degree}.effects.${index}`, what: `effect:${effect?.kind}` });
+            if (effect?.kind !== "condition" && effect?.kind !== "end-condition" && effect?.kind !== "temp-hp" && effect?.kind !== "heal" && !PASSED_EFFECTS.has(effect?.kind)) gaps.push({ path: `resolution.outcomes.${degree}.effects.${index}`, what: `effect:${effect?.kind}` });
         }
         for (const [index, entry] of (outcome.noteEffects ?? []).entries()) {
             if (entry?.choiceGroup && !(entry.choiceGroup === "caster-option" && resolution.casterChoice?.kind === "option")) gaps.push({ path: `resolution.outcomes.${degree}.noteEffects.${index}`, what: `choiceGroup:${entry.choiceGroup}` });
@@ -339,10 +339,14 @@ export function* saveSteps(plan, context = {}) {
             else if (effect?.kind === "end-condition") changes.push({ op: "end", target: recipient, what: { conditions: effect.slugs ?? [effect.slug], from: effect.recipient === "self" ? target : null, ...(effect.stabilize ? { stabilize: true } : {}) } });
             // Temporary Hit Points ("gains 40 temporary Hit Points that last for 1 minute", "6d8 temporary Hit Points"): a fixed
             // amount, or the formula rolled; duration as a condition's, for the runtime.
-            else if (effect?.kind === "temp-hp") {
+            // (fromDamage: "temporary Hit Points equal to the damage dealt", this row's damage on this target as rolled.)
+            else if (effect?.kind === "temp-hp" || effect?.kind === "heal") {
                 const fixed = Number(effect.amount);
-                const amount = Number.isFinite(fixed) ? fixed : (yield* rollEach(parseDamage(String(effect.formula ?? "0")))).reduce((sum, { amount: rolled }) => sum + rolled, 0);
-                if (amount > 0) changes.push({ op: "tempHp", target: recipient, amount, duration: effect.duration ?? null });
+                const dealt = rolled.filter(({ instance }) => instance.category !== "persistent").reduce((sum, { amount: rolledAmount }) => sum + rolledAmount, 0);
+                const amount = effect.fromDamage ? dealt : Number.isFinite(fixed) ? fixed : (yield* rollEach(parseDamage(String(effect.formula ?? "0")))).reduce((sum, { amount: rolledAmount }) => sum + rolledAmount, 0);
+                // Healing on the creature (Drink Blood's "regains 10 Hit Points, gaining any excess as temporary Hit Points").
+                if (amount > 0 && effect.kind === "heal") changes.push({ op: "heal", target: recipient, amount, ...(effect.excessAsTemp ? { excessAsTemp: true } : {}) });
+                else if (amount > 0) changes.push({ op: "tempHp", target: recipient, amount, duration: effect.duration ?? null });
             }
             // Disarm (the item falls, or the grip weakens) and Swallow Whole: passed on for the runtime to play.
             else if (PASSED_EFFECTS.has(effect?.kind)) changes.push({ op: "effect", target: recipient, effect: passedEffect(effect) });
