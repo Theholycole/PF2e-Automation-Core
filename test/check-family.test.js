@@ -101,3 +101,19 @@ test("an automatic check rolls nothing: every target gets the success row (2026-
     assert.ok(result.changes.some((change) => change.op === "damage" && change.target === "b"));
     assert.deepEqual(validateChanges(result.changes), []);
 });
+
+test("temporary Hit Points: a fixed amount, or the formula rolled (2026-10-10)", () => {
+    const registry = createRegistry();
+    for (const family of CORE_FAMILIES) registry.registerFamily(family);
+    const plan = (effect) => ({
+        modelVersion: 13, source: { name: "Fed by Water" }, rank: 1, traits: [],
+        resolution: { kind: "check", check: { roll: "automatic", statistic: "automatic" }, sharedDamage: null, outcomes: { criticalSuccess: none, success: { ...none, effects: [effect] }, failure: none, criticalFailure: none } }
+    });
+    const minute = { mode: "fixed", value: 1, unit: "minutes", expiry: null, anchor: "effect-start" };
+    const context = { caster: { id: "dragon" }, targets: [{ id: "dragon" }], statistic: () => ({ modifier: 0, dc: 10 }) };
+    const fixed = registry.resolveSync(plan({ kind: "temp-hp", amount: 40, duration: minute }), context, { roll: () => ({ degree: "success" }), damage: () => 0 }).changes;
+    assert.deepEqual(fixed.filter((change) => change.op === "tempHp"), [{ op: "tempHp", target: "dragon", amount: 40, duration: minute }]);
+    assert.deepEqual(validateChanges(fixed), []);
+    const rolled = registry.resolveSync(plan({ kind: "temp-hp", formula: "6d8", duration: minute }), context, { roll: () => ({ degree: "success" }), damage: () => 27 }).changes;
+    assert.equal(rolled.find((change) => change.op === "tempHp").amount, 27);
+});

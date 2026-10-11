@@ -68,7 +68,7 @@ export function saveGaps(plan) {
             gaps.push({ path: `resolution.outcomes.${degree}.${key}`, what: key });
         }
         for (const [index, effect] of (outcome.effects ?? []).entries()) {
-            if (effect?.kind !== "condition" && effect?.kind !== "end-condition" && !PASSED_EFFECTS.has(effect?.kind)) gaps.push({ path: `resolution.outcomes.${degree}.effects.${index}`, what: `effect:${effect?.kind}` });
+            if (effect?.kind !== "condition" && effect?.kind !== "end-condition" && effect?.kind !== "temp-hp" && !PASSED_EFFECTS.has(effect?.kind)) gaps.push({ path: `resolution.outcomes.${degree}.effects.${index}`, what: `effect:${effect?.kind}` });
         }
         for (const [index, entry] of (outcome.noteEffects ?? []).entries()) {
             if (entry?.choiceGroup && !(entry.choiceGroup === "caster-option" && resolution.casterChoice?.kind === "option")) gaps.push({ path: `resolution.outcomes.${degree}.noteEffects.${index}`, what: `choiceGroup:${entry.choiceGroup}` });
@@ -337,6 +337,13 @@ export function* saveSteps(plan, context = {}) {
             const scope = effect?.scope ? { attacker: effect.scope.against === "target" ? target : caster ? idOf(context, caster, -1) : null, attacks: effect.scope.attacks ?? "any", uses: effect.scope.uses ?? null } : null;
             if (effect?.kind === "condition") changes.push({ op: "condition", target: recipient, slug: effect.slug, value: Number.isFinite(effect.value) ? effect.value : null, duration: effect.duration ?? null, ...(scope ? { scope } : {}) });
             else if (effect?.kind === "end-condition") changes.push({ op: "end", target: recipient, what: { conditions: effect.slugs ?? [effect.slug], from: effect.recipient === "self" ? target : null, ...(effect.stabilize ? { stabilize: true } : {}) } });
+            // Temporary Hit Points ("gains 40 temporary Hit Points that last for 1 minute", "6d8 temporary Hit Points"): a fixed
+            // amount, or the formula rolled; duration as a condition's, for the runtime.
+            else if (effect?.kind === "temp-hp") {
+                const fixed = Number(effect.amount);
+                const amount = Number.isFinite(fixed) ? fixed : (yield* rollEach(parseDamage(String(effect.formula ?? "0")))).reduce((sum, { amount: rolled }) => sum + rolled, 0);
+                if (amount > 0) changes.push({ op: "tempHp", target: recipient, amount, duration: effect.duration ?? null });
+            }
             // Disarm (the item falls, or the grip weakens) and Swallow Whole: passed on for the runtime to play.
             else if (PASSED_EFFECTS.has(effect?.kind)) changes.push({ op: "effect", target: recipient, effect: passedEffect(effect) });
         }
