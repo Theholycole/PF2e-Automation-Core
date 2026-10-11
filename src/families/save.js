@@ -270,7 +270,9 @@ export function* saveSteps(plan, context = {}) {
             const skill = statisticOf(context, caster, slug);
             const defence = statisticOf(context, actor, check.against?.statistic ?? "will");
             const dc = check.against?.dc === "fixed" ? check.against.value : defence.dc ?? 10 + (defence.modifier ?? 0);
-            roll = yield { type: "roll", statistic: slug, options: { actor: caster, target: actor, modifier: skill.modifier + adjustment, dc, traits: plan.traits ?? [] } };
+            // A bonus of its own ("They gain a +4 status bonus to the Athletics check", batch 36): added, and passed on for a live roll.
+            const bonus = Number(check.bonus?.value) || 0;
+            roll = yield { type: "roll", statistic: slug, options: { actor: caster, target: actor, modifier: skill.modifier + adjustment + bonus, dc, traits: plan.traits ?? [], ...(bonus ? { bonus: { value: bonus, type: check.bonus.type ?? "untyped" } } : {}) } };
         } else {
             const slugs = check.saveChoice?.statistics?.length ? check.saveChoice.statistics : [check.statistic];
             // The target's choice (Shadow Blast): its best save.

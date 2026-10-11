@@ -130,3 +130,13 @@ test("healing the creature, and temporary Hit Points equal to the damage dealt (
     assert.deepEqual(changes.filter((change) => change.op !== "damage"), [{ op: "tempHp", target: "leech", amount: 14, duration: null }, { op: "heal", target: "leech", amount: 8, excessAsTemp: true }]);
     assert.deepEqual(validateChanges(changes), []);
 });
+
+test("a check's own bonus: added to the roll's modifier and passed on (2026-10-10, batch 36)", () => {
+    const registry = createRegistry();
+    for (const family of CORE_FAMILIES) registry.registerFamily(family);
+    const plan = { modelVersion: 13, source: { name: "Test Disarm" }, rank: 1, traits: [], resolution: { kind: "check", check: { roll: "skill", statistic: "athletics", against: { dc: "target", statistic: "reflex" }, bonus: { value: 4, type: "status" } }, sharedDamage: null, outcomes: { criticalSuccess: none, success: none, failure: none, criticalFailure: none } } };
+    const context = { caster: { id: "imp" }, targets: [{ id: "fighter" }], statistic: (actor, slug) => (slug === "athletics" ? { modifier: 7, dc: 17 } : { modifier: 5, dc: 20 }) };
+    const asked = [];
+    registry.resolveSync(plan, context, { roll: (statistic, options) => (asked.push(options), { degree: "success" }), damage: () => 0 });
+    assert.deepEqual([asked[0].modifier, asked[0].bonus, asked[0].dc], [11, { value: 4, type: "status" }, 20]);
+});
