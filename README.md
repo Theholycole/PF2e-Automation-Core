@@ -12,7 +12,7 @@ To install it yourself, in Foundry go to **Add-on Modules → Install Module**, 
 https://github.com/Theholycole/PF2e-Automation-Core/releases/latest/download/module.json
 ```
 
-Foundry 14 and the PF2e system 8.5 or later. MIT licensed (see [LICENSE](LICENSE)); the Pathfinder rules text it reads comes from the PF2e system under Paizo's ORC license.
+Foundry 14 and the PF2e system 8.5 or later. [libWrapper](https://foundryvtt.com/packages/lib-wrapper) is optional: when it's active, the core's patches (PF2e's `applyDamage`, `prepareRuleElements`, item `createDocuments`, `Check.roll`, `CheckRoll#evaluate` and the difficult-terrain behaviour) go through it, so modules that wrap the same functions (PF2e Toolbelt, PF2E Incapacitation Variants) are ordered with them. The classes PF2e keeps at no global path are named under `CONFIG.pf2eResolutionCore` for libWrapper. MIT licensed (see [LICENSE](LICENSE)); the Pathfinder rules text it reads comes from the PF2e system under Paizo's ORC license.
 
 **Status (2026-10-08): milestones 2 and 3 under way.** 54 Node tests pass.
 
@@ -54,7 +54,7 @@ A family turns a plan into Change ops and typed decisions. It's written as **ste
 | Path | Holds |
 |---|---|
 | `src/` | pure code (Node, Web Workers, the simulator): `index.js`, `model/` (including `dice.js`, PF2e damage formulas), `families/`, `registry.js`, `drive.js`, `io.js`, `patch-logic.js`, `text/` (shared text readers, including `hazard-text.js`: a hazard's Disable options, routine actions, Strikes without a multiple attack penalty) |
-| `scripts/` | Foundry: `main.js` (the API), `patches.js` (the shared PF2e patches), `runtime-utils.js` |
+| `scripts/` | Foundry: `main.js` (the API), `patches.js` (the shared PF2e patches), `wrap.js` (each patch through libWrapper when it's active, directly otherwise), `runtime-utils.js` |
 | `docs/plan-model.md` | the agreed design |
 | `docs/switch-over.md` | what the spell module changes to use the core |
 

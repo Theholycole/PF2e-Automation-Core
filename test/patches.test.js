@@ -220,3 +220,56 @@ test("with no rewriter, or while the spell module patches, no actor is prepared 
         assert.deepEqual(reset, []);
     }
 });
+
+// libWrapper, as far as the core uses it: register(package, path, wrapper, type), the wrapper called with the next function first.
+function fakeLibWrapper() {
+    const registered = [];
+    globalThis.libWrapper = {
+        register(packageId, target, fn, type) {
+            registered.push({ packageId, target, type });
+            const path = target.split(".");
+            const key = path.pop();
+            const owner = path.reduce((object, part) => object[part], globalThis);
+            const original = owner[key];
+            owner[key] = function (...args) {
+                return fn.call(this, (...inner) => original.apply(this, inner), ...args);
+            };
+        }
+    };
+    globalThis.game.modules = new Map([["lib-wrapper", { active: true }]]);
+    return registered;
+}
+
+test("with libWrapper on, every patch goes through it, once, by a path it can reach (2026-10-11)", async () => {
+    const fake = fakeFoundry({ spellModulePatches: false });
+    const registered = fakeLibWrapper();
+    try {
+        const { patchesApi } = await install(fake, { beforeSetup: (api) => api.rules.registerRewriter({ module: "spells", rewrite: (item, rules) => [...rules, { key: "Added" }] }) });
+        assert.deepEqual(patchesApi.status(), { damage: "core", rules: "core", d20: "core", terrain: "core" });
+        assert.deepEqual(registered, [
+            { packageId: "pf2e-resolution-core", target: "CONFIG.pf2eResolutionCore.ItemPF2e.prototype.prepareRuleElements", type: "WRAPPER" },
+            { packageId: "pf2e-resolution-core", target: "CONFIG.pf2eResolutionCore.ItemPF2e.createDocuments", type: "WRAPPER" },
+            { packageId: "pf2e-resolution-core", target: "CONFIG.Actor.documentClass.prototype.applyDamage", type: "WRAPPER" },
+            { packageId: "pf2e-resolution-core", target: "game.pf2e.Check.roll", type: "WRAPPER" },
+            { packageId: "pf2e-resolution-core", target: "CONFIG.pf2eResolutionCore.CheckRoll.prototype.evaluate", type: "WRAPPER" },
+            { packageId: "pf2e-resolution-core", target: "CONFIG.RegionBehavior.dataModels.modifyMovementCost.prototype._getTerrainEffects", type: "MIXED" }
+        ]);
+        // The classes PF2e keeps at no global path, named for libWrapper.
+        assert.equal(globalThis.CONFIG.pf2eResolutionCore.ItemPF2e, fake.ItemPF2e);
+        assert.equal(globalThis.CONFIG.pf2eResolutionCore.CheckRoll, fake.CheckRoll);
+        // Installing again registers nothing more.
+        await install(fake);
+        assert.equal(registered.length, 6);
+        // The wrapped functions still do their work.
+        let seen = null;
+        patchesApi.damage.onApply({ module: "spells", before: (actor, params) => { seen = params.damage.instances.length; return null; } });
+        assert.equal(new fake.Actor().applyDamage({ damage: { instances: [{ type: "fire" }] } }), "applied 1");
+        assert.equal(seen, 1);
+        const item = new fake.ItemPF2e();
+        item.system = { rules: [] };
+        assert.deepEqual(item.prepareRuleElements(), [{ key: "Added" }]);
+        assert.equal(await fake.Check.roll({}, {}), "rolled");
+    } finally {
+        delete globalThis.libWrapper;
+    }
+});

@@ -9,16 +9,30 @@
 //   d20      PF2e's Check.roll and CheckRoll#evaluate: d20 limits.
 //   terrain  modifyMovementCost#_getTerrainEffects: per-creature terrain.
 //
+// Each goes through libWrapper when it's active (scripts/wrap.js). The classes
+// PF2e keeps at no global path (the base item class, CheckRoll) are named
+// under CONFIG.pf2eResolutionCore for libWrapper's paths, and what's installed
+// is recorded there too, so nothing is wrapped twice.
+//
 // Safe switch-over: a patch is skipped while the spell module still installs
 // its own version (its markers are checked), so nothing is wrapped twice. The
 // core installs after every module's "ready" handlers have run.
 
 import { clampD20, combineD20Limits, d20Mark, damageMemoryFrom, readD20Mark, recentSource, rewriteRules, selectiveDifficulty, terrainEffects, transformCreated, isSystemContextMessage, isTurnChange } from "../src/patch-logic.js";
 import { activeGM, isLeadGM } from "./runtime-utils.js";
+import { wrapMethod } from "./wrap.js";
 
 const CORE_ID = "pf2e-resolution-core";
 const SPELL_MODULE_ID = "pf2e-automatic-resolution";
 const MARK = "__pf2eResolutionCore";
+const SHARED = "pf2eResolutionCore";
+
+// CONFIG.pf2eResolutionCore: { installed: { damage, rules, d20, terrain }, ItemPF2e, CheckRoll }.
+const shared = () => (CONFIG[SHARED] ??= { installed: {} });
+const installed = (name) => Boolean(shared().installed?.[name]);
+const markInstalled = (name) => {
+    (shared().installed ??= {})[name] = true;
+};
 
 const status = { damage: "not-installed", rules: "not-installed", d20: "not-installed", terrain: "not-installed" };
 const damageListeners = [];
@@ -45,9 +59,8 @@ function register(list, entry, required) {
 function installDamage() {
     const Actor = CONFIG.Actor.documentClass;
     if (Actor.prototype.__pf2eAutoDamageTypes) return "spell-module";
-    if (Actor.prototype[MARK]?.damage) return "core";
-    const original = Actor.prototype.applyDamage;
-    Actor.prototype.applyDamage = function (params = {}, ...rest) {
+    if (Actor.prototype[MARK]?.damage || installed("damage")) return "core";
+    wrapMethod(CORE_ID, "CONFIG.Actor.documentClass.prototype.applyDamage", function (original, params = {}, ...rest) {
         // Listeners run in registration order. before() may return an after-callback,
         // or { params, after } to replace the parameters (Duplicate Foe's halved copies).
         const after = [];
@@ -71,7 +84,7 @@ function installDamage() {
         } catch {
             // Memory is best effort; the damage itself must go through.
         }
-        const result = original.call(this, current, ...rest);
+        const result = original(current, ...rest);
         if (!after.length) return result;
         // The after-callbacks are awaited in order, each on its own, before the
         // caller's await resolves: callers read HP right after applyDamage.
@@ -86,8 +99,8 @@ function installDamage() {
             }
             return value;
         })();
-    };
-    Actor.prototype[MARK] = { ...(Actor.prototype[MARK] ?? {}), damage: true };
+    });
+    markInstalled("damage");
     Hooks.on("preCreateChatMessage", (document, data) => {
         try {
             if (data?.flags?.pf2e?.context?.type !== "damage-taken") return;
@@ -114,18 +127,17 @@ function installRules() {
     const ItemPF2e = itemBaseClass();
     if (!ItemPF2e?.prototype?.prepareRuleElements) return "not-installed";
     if (ItemPF2e.prototype.prepareRuleElements[SPELL_MODULE_ID]) return "spell-module";
-    if (ItemPF2e.prototype.prepareRuleElements[MARK]) return "core";
-    const prepare = ItemPF2e.prototype.prepareRuleElements;
-    ItemPF2e.prototype.prepareRuleElements = function (...args) {
+    if (ItemPF2e.prototype.prepareRuleElements[MARK] || installed("rules")) return "core";
+    shared().ItemPF2e = ItemPF2e;
+    wrapMethod(CORE_ID, `CONFIG.${SHARED}.ItemPF2e.prototype.prepareRuleElements`, function (prepare, ...args) {
         if (ruleRewriters.length) this.system.rules = rewriteRules(ruleRewriters, this, this.system.rules);
-        return prepare.apply(this, args);
-    };
-    ItemPF2e.prototype.prepareRuleElements[MARK] = true;
-    const create = ItemPF2e.createDocuments;
-    ItemPF2e.createDocuments = async function (data = [], options = {}) {
+        return prepare(...args);
+    });
+    wrapMethod(CORE_ID, `CONFIG.${SHARED}.ItemPF2e.createDocuments`, async function (create, data = [], options = {}, ...rest) {
         if (createTransformers.length && options?.parent) data = transformCreated(createTransformers, data, options.parent);
-        return create.call(this, data, options);
-    };
+        return create(data, options, ...rest);
+    });
+    markInstalled("rules");
     return "core";
 }
 
@@ -161,9 +173,9 @@ function installD20() {
     const CheckRoll = (CONFIG.Dice?.rolls ?? []).find((candidate) => candidate?.name === "CheckRoll");
     if (!Check?.roll || !CheckRoll) return "not-installed";
     if (Check.roll[SPELL_MODULE_ID]) return "spell-module";
-    if (Check.roll[MARK]) return "core";
-    const roll = Check.roll;
-    Check.roll = async function (check, context = {}, ...rest) {
+    if (Check.roll[MARK] || installed("d20")) return "core";
+    shared().CheckRoll = CheckRoll;
+    wrapMethod(CORE_ID, "game.pf2e.Check.roll", async function (roll, check, context = {}, ...rest) {
         const actor = context?.origin?.actor ?? context?.actor ?? null;
         if (actor && d20Providers.length) {
             const limits = combineD20Limits(d20Providers.map((provider) => {
@@ -175,12 +187,10 @@ function installD20() {
             }));
             if (limits) context.domains = [...(context.domains ?? []), d20Mark(limits)];
         }
-        return roll.call(this, check, context, ...rest);
-    };
-    Check.roll[MARK] = true;
-    const evaluate = CheckRoll.prototype.evaluate;
-    CheckRoll.prototype.evaluate = async function (...args) {
-        const result = await evaluate.apply(this, args);
+        return roll(check, context, ...rest);
+    });
+    wrapMethod(CORE_ID, `CONFIG.${SHARED}.CheckRoll.prototype.evaluate`, async function (evaluate, ...args) {
+        const result = await evaluate(...args);
         const limits = readD20Mark(this.options?.domains);
         if (!limits) return result;
         let changed = false;
@@ -209,7 +219,8 @@ function installD20() {
             this.options.d20Clamped = limits;
         }
         return result;
-    };
+    });
+    markInstalled("d20");
     return "core";
 }
 
@@ -219,9 +230,9 @@ function installTerrain() {
     const type = CONFIG.RegionBehavior?.dataModels?.modifyMovementCost;
     if (!type?.prototype?._getTerrainEffects) return "not-installed";
     if (type.prototype._pf2eAutoSelective) return "spell-module";
-    if (type.prototype[MARK]) return "core";
-    const original = type.prototype._getTerrainEffects;
-    type.prototype._getTerrainEffects = function (token, segment, options) {
+    if (type.prototype[MARK] || installed("terrain")) return "core";
+    // (It may answer without PF2e's own terrain: MIXED.)
+    wrapMethod(CORE_ID, "CONFIG.RegionBehavior.dataModels.modifyMovementCost.prototype._getTerrainEffects", function (original, token, segment, options) {
         let spec = this.behavior?.flags?.[CORE_ID]?.selectiveTerrain ?? this.parent?.flags?.[CORE_ID]?.selectiveTerrain ?? null;
         for (const provider of terrainProviders) {
             if (spec) break;
@@ -231,13 +242,13 @@ function installTerrain() {
                 spec = null;
             }
         }
-        if (!spec) return original.call(this, token, segment, options);
+        if (!spec) return original(token, segment, options);
         const actor = token?.actor ?? token?.document?.actor;
         const creature = { uuid: actor?.uuid, isCreature: Boolean(actor?.isOfType?.("creature")), size: actor?.size, modeOfBeing: actor?.modeOfBeing };
         const difficulty = selectiveDifficulty(spec, creature, segment?.action);
         return difficulty === null ? [] : terrainEffects(difficulty);
-    };
-    type.prototype[MARK] = true;
+    }, "MIXED");
+    markInstalled("terrain");
     return "core";
 }
 
