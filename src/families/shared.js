@@ -21,10 +21,11 @@ export function sharedDamageOf(plan) {
 }
 
 // The plan as cast with that many actions: native.byActions[n] is a partial
-// overlay of targeting, healing, sharedDamage, check and outcomes (PF2e's
+// overlay of targeting, healing, sharedDamage, check, outcomes and rows (PF2e's
 // action overlays: Heal's 1, 2 and 3-action versions, Blazing Bolt's rays);
 // healing, check and outcomes overlay the native ones, sharedDamage the native
-// one or else the plan's own. Without a count, the lowest variant.
+// one or else the plan's own, rows the plan's own outcomes. Without a count,
+// the lowest variant.
 export function planWithActions(plan, actions) {
     const variants = nativeOf(plan).byActions;
     if (!variants || typeof variants !== "object") return plan;
@@ -41,6 +42,8 @@ export function planWithActions(plan, actions) {
     }
     // New component ids bring their own rows (Blazing Bolt has no base damage).
     if (overlay.outcomes !== undefined) native.outcomes = overlay.outcomes;
+    // The plan's own rows for that count (a troop's attack that also grabs with 2 actions).
+    if (overlay.rows !== undefined) resolution.outcomes = overlay.rows;
     if (overlay.check !== undefined) native.check = overlay.check;
     return {
         ...plan,

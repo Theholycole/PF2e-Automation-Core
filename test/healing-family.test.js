@@ -82,6 +82,13 @@ test("action variants: the overlay for the chosen count, the lowest without one"
     assert.equal(planWithActions(SOOTHE, 2), SOOTHE, "no variants: the plan as it is");
 });
 
+test("action variants: rows replace the plan's own outcomes for that count", () => {
+    const grabbed = { damage: { mode: "shared", rollScope: "target" }, effects: [{ kind: "condition", slug: "grabbed" }] };
+    const plan = { resolution: { kind: "save", outcomes: { failure: { effects: [] } }, native: { byActions: { 1: {}, 2: { rows: { failure: grabbed } } } } } };
+    assert.deepEqual(planWithActions(plan, 2).resolution.outcomes, { failure: grabbed });
+    assert.deepEqual(planWithActions(plan, 1).resolution.outcomes, { failure: { effects: [] } }, "a count without rows keeps them");
+});
+
 test("Heal: living targets are healed and don't save; undead save against the vitality damage", () => {
     const result = resolveSaveSync(HEAL, context(["fighter", "zombie"], { actions: 2, castRank: 3 }), average);
     // 3d8+24 healing at rank 3 with two actions (13.5 + 24, rounded down); 3d8 vitality on a failed save.
