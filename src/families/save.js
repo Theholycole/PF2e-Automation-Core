@@ -266,8 +266,11 @@ export function* saveSteps(plan, context = {}) {
             // The actor's skill against the target's DC (Trip: Athletics against Reflex DC).
             // A list of statistics (Escape): the actor's best.
             const options = [].concat(check.statistic);
-            const slug = options.reduce((best, slug) => ((statisticOf(context, caster, slug).modifier ?? 0) > (statisticOf(context, caster, best).modifier ?? 0) ? slug : best));
-            const skill = statisticOf(context, caster, slug);
+            // A fixed modifier of its own (PF2e's special attack statistics, "@Check[efficient-capture|against:ac]{+16}", batch 121):
+            // that, with the context's adjustment for the actor (its penalties, the multiple attack penalty), asked as "fixed-check".
+            const fixed = Number.isFinite(check.modifier) ? check.modifier : null;
+            const slug = fixed !== null ? options[0] : options.reduce((best, slug) => ((statisticOf(context, caster, slug).modifier ?? 0) > (statisticOf(context, caster, best).modifier ?? 0) ? slug : best));
+            const skill = fixed !== null ? { modifier: fixed + (context.statistic?.(caster, "fixed-check")?.modifier ?? 0) } : statisticOf(context, caster, slug);
             const defence = statisticOf(context, actor, check.against?.statistic ?? "will");
             const dc = check.against?.dc === "fixed" ? check.against.value : defence.dc ?? 10 + (defence.modifier ?? 0);
             // A bonus of its own ("They gain a +4 status bonus to the Athletics check", batch 36): added, and passed on for a live roll.

@@ -140,3 +140,13 @@ test("a check's own bonus: added to the roll's modifier and passed on (2026-10-1
     registry.resolveSync(plan, context, { roll: (statistic, options) => (asked.push(options), { degree: "success" }), damage: () => 0 });
     assert.deepEqual([asked[0].modifier, asked[0].bonus, asked[0].dc], [11, { value: 4, type: "status" }, 20]);
 });
+
+test("a check with a fixed modifier of its own: that, plus the context's adjustment, against the target's AC (2026-10-12, batch 121)", () => {
+    const registry = createRegistry();
+    for (const family of CORE_FAMILIES) registry.registerFamily(family);
+    const plan = { modelVersion: 13, source: { name: "Test Capture" }, rank: 1, traits: ["attack"], resolution: { kind: "check", check: { roll: "skill", statistic: "test-capture", against: { dc: "target", statistic: "ac" }, modifier: 16 }, sharedDamage: null, outcomes: { criticalSuccess: none, success: none, failure: none, criticalFailure: none } } };
+    const statistic = (actor, slug) => (slug === "fixed-check" ? { modifier: -5 } : slug === "ac" ? { dc: 22 } : null);
+    const asked = [];
+    registry.resolveSync(plan, { caster: { id: "thug" }, targets: [{ id: "fighter" }], statistic }, { roll: (slug, options) => (asked.push([slug, options.modifier, options.dc]), { degree: "success" }), damage: () => 0 });
+    assert.deepEqual(asked, [["test-capture", 11, 22]]);
+});
