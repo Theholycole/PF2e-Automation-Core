@@ -282,7 +282,10 @@ export function* saveSteps(plan, context = {}) {
             const slug = slugs.reduce((best, slug) => (statisticOf(context, actor, slug).modifier > statisticOf(context, actor, best).modifier ? slug : best));
             const save = statisticOf(context, actor, slug);
             const dc = check.against?.dc === "fixed" ? check.against.value : (context.dc ?? statisticOf(context, caster, "spell").dc);
-            roll = yield { type: "roll", statistic: slug, options: { actor, modifier: save.modifier + adjustment, dc } };
+            // (2026-10-13, ability batch 286: the save's own bonus or penalty — a poison's save made 2 harder after a critical hit — and a save rolled
+            // twice, the worse kept: misfortune.)
+            const bonus = Number(check.bonus?.value) || 0;
+            roll = yield { type: "roll", statistic: slug, options: { actor, modifier: save.modifier + adjustment + bonus, dc, ...(bonus ? { bonus: { value: bonus, type: check.bonus.type ?? "untyped" } } : {}), ...(check.misfortune ? { misfortune: true } : {}) } };
         }
         let degree = roll.degree;
 

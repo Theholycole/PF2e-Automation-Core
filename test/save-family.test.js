@@ -312,3 +312,14 @@ test("a bonus on the actor against the target only (2026-10-13): the change name
     const result = await resolveSave(gauge, context, io);
     assert.deepEqual(result.changes, [{ op: "effect", target: "caster", effect: { kind: "modifier", modifier: { selector: "ac", value: 2, type: "circumstance", recipient: "self", against: "target", duration } }, against: "a" }]);
 });
+
+test("a save's own penalty and a save rolled twice (2026-10-13): on the roll's options", async () => {
+    const venom = plan("Test Venom", 1, { ...FEAR.resolution, check: { statistic: "fortitude", basic: false, against: { dc: "fixed", value: 23 }, bonus: { value: -2, type: "circumstance" } } });
+    const curse = plan("Test Curse", 1, { ...FEAR.resolution, check: { statistic: "will", basic: false, against: { dc: "fixed", value: 26 }, misfortune: true } });
+    const { context, io } = scene({ degrees: { a: "failure", b: "success" } });
+    const seen = [];
+    const watched = { ...io, roll: (statistic, options) => (seen.push({ statistic, modifier: options.modifier, bonus: options.bonus ?? null, misfortune: options.misfortune ?? false }), io.roll(statistic, options)) };
+    await resolveSave(venom, { ...context, targets: [context.targets[0]] }, watched);
+    await resolveSave(curse, { ...context, targets: [context.targets[0]] }, watched);
+    assert.deepEqual(seen, [{ statistic: "fortitude", modifier: 7, bonus: { value: -2, type: "circumstance" }, misfortune: false }, { statistic: "will", modifier: 6, bonus: null, misfortune: true }]);
+});
