@@ -385,7 +385,9 @@ export function* saveSteps(plan, context = {}) {
         for (const followUp of outcome.followUps ?? []) {
             if (followUp?.kind !== "save") continue;
             // A second save for the affected creature (Phantasmal Calamity): a plan of its own, resolved by this family again.
-            const followUpPlan = { modelVersion: plan.modelVersion, source: { ...(plan.source ?? {}), name: `${plan.source?.name ?? "Spell"} (follow-up)` }, rank: plan.rank, resolution: { kind: SAVE_KIND, check: followUp.check, sharedDamage: resolution.sharedDamage ?? null, outcomes: followUp.outcomes } };
+            // (Its own affliction, "… save or be exposed to jungle drake venom": the poison's save after the first, handed on as the poison's.)
+            const handoff = followUp.afflictionHandoff ?? null;
+            const followUpPlan = { modelVersion: plan.modelVersion, source: { ...(plan.source ?? {}), name: `${plan.source?.name ?? "Spell"} (follow-up)` }, rank: plan.rank, targeting: { target: "1 creature", range: null, area: null }, trigger: { event: "use" }, resolution: { kind: SAVE_KIND, check: followUp.check, sharedDamage: handoff ? null : resolution.sharedDamage ?? null, outcomes: followUp.outcomes, ...(handoff ? { afflictionHandoff: handoff } : {}) } };
             changes.push({ op: "followUp", target, plan: followUpPlan, when: "now" });
         }
         if (outcome.terminal?.kind === "death") changes.push({ op: "death", target });

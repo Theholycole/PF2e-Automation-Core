@@ -214,6 +214,14 @@ test("choices, damage pools, death and follow-up saves", async () => {
     assert.equal(followUp.target, "a");
     const four = scene({ degrees: { a: "failure" } });
     assert.deepEqual((await resolveSave(followUp.plan, { ...four.context, targets: [four.creatures.a] }, four.io)).changes, [{ op: "condition", target: "a", slug: "immobilized", value: null, duration: null }]);
+    // (2026-10-12: a follow-up with its own affliction — the poison's save after a failed first one, its stages handed on.)
+    const handoff = { handler: "pseudo-afflictions", name: "Test Venom", stages: [{ stage: 1 }] };
+    const venom = plan("Venom", 1, { ...FEAR.resolution, outcomes: degreeRows({ failure: { followUps: [{ kind: "save", check: { statistic: "fortitude" }, outcomes: degreeRows({ failure: { affliction: { stage: 1 } } }), afflictionHandoff: handoff }] } }) });
+    const five = scene({ degrees: { a: "failure" } });
+    const poison = (await resolveSave(venom, five.context, five.io)).changes[0];
+    assert.deepEqual([poison.op, poison.plan.resolution.afflictionHandoff, poison.plan.targeting.target], ["followUp", handoff, "1 creature"]);
+    const six = scene({ degrees: { a: "failure" } });
+    assert.deepEqual((await resolveSave(poison.plan, { ...six.context, targets: [six.creatures.a] }, six.io)).changes, [{ op: "affliction", target: "a", data: { ...handoff, stage: 1 } }]);
 });
 
 test("the core registers the save family; registry.resolve runs it with the seeded roller", async () => {

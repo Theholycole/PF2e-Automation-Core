@@ -28,6 +28,8 @@ The spell compiler's plans (model version 12) are the base. In the current compi
 | `resolution.outcomes[degree]` | `damage`, `effects`, `modifiers`, `followUps`, `manualInstructions`, `terminal`, `rawText`, `semanticCoverage` |
 | `automation`, `diagnostics`, `delegations` | coverage and what wasn't compiled |
 
+A **follow-up** (`outcomes[degree].followUps: [{ kind: "save", check, outcomes, afflictionHandoff? }]`) is a second save for the creature, resolved as a plan of its own. With `afflictionHandoff` (2026-10-12) it is an affliction's save after a first one ("… save or be exposed to jungle drake venom"): its rows' `affliction` stages are handed on as the affliction's.
+
 The most common payload keys are `applications` (1,146 plans), `note` (436), `reminders` (213), `lingering` (133), `incarnate` (86), `dataNotes`, `effectNote`, `temporaryImmunity`, `recipient`, `modes`, `operations`, `heightened`, `casterChoice`, `ritualDegrees`, `afflictionHandoff`, `degreeAdjustment`, `attackAdjustment`, `controls`, `summon` and `storedTrigger`.
 
 **Rules:**
