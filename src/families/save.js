@@ -365,7 +365,10 @@ export function* saveSteps(plan, context = {}) {
         }
         for (const modifier of outcome.modifiers ?? []) {
             // A penalty on the actor itself (Bon Mot's critical failure: "You take the same penalty").
-            changes.push({ op: "effect", target: modifier?.recipient === "self" && caster ? idOf(context, caster, -1) : target, effect: { kind: "modifier", modifier } });
+            // (2026-10-13: a bonus on the actor against this target only, "+2 to attack rolls and AC against the target creature": against, for
+            // the runtime to scope it.)
+            const self = modifier?.recipient === "self" && caster;
+            changes.push({ op: "effect", target: self ? idOf(context, caster, -1) : target, effect: { kind: "modifier", modifier }, ...(self && modifier.against === "target" ? { against: target } : {}) });
         }
         for (const note of outcome.noteEffects ?? []) {
             if (note.choiceGroup === "caster-option" && option !== null && note.option !== option) continue;

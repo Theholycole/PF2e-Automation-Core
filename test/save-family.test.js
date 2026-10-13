@@ -304,3 +304,11 @@ test("a worse condition for a creature that already has the first carries to the
     const result = await resolveSave(gaze, context, io);
     assert.deepEqual(result.changes, [{ op: "condition", target: "a", slug: "slowed", value: 1, duration: null, escalate: { if: "slowed", slug: "petrified", value: null, duration: null } }]);
 });
+
+test("a bonus on the actor against the target only (2026-10-13): the change names that target", async () => {
+    const duration = { mode: "fixed", value: 1, unit: "minutes" };
+    const gauge = plan("Test Gauge", 1, { ...FEAR.resolution, outcomes: degreeRows({ failure: { modifiers: [{ selector: "ac", value: 2, type: "circumstance", recipient: "self", against: "target", duration }] } }) });
+    const { context, io } = scene({ degrees: { a: "failure", b: "success" } });
+    const result = await resolveSave(gauge, context, io);
+    assert.deepEqual(result.changes, [{ op: "effect", target: "caster", effect: { kind: "modifier", modifier: { selector: "ac", value: 2, type: "circumstance", recipient: "self", against: "target", duration } }, against: "a" }]);
+});
