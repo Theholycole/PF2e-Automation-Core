@@ -128,7 +128,7 @@ test("Force Barrage: missiles by actions and rank, spread over the targets and c
 test("the core registers its families", async () => {
     const registry = createRegistry();
     for (const family of CORE_FAMILIES) registry.registerFamily(family);
-    assert.deepEqual(registry.families().map((family) => family.kind).sort(), ["check", "direct-damage", "effect", "healing", "save", "unsupported"]);
+    assert.deepEqual(registry.families().map((family) => family.kind).sort(), ["check", "condition-note", "direct-damage", "effect", "healing", "save", "stabilize", "unsupported"]);
     const live = await registry.resolve(SOOTHE, context(["fighter"]), { roll: () => ({ degree: "success" }), damage: () => 5 });
     assert.deepEqual(live.changes, [{ op: "heal", target: "fighter", amount: 5 }]);
 });
