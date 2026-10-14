@@ -376,7 +376,8 @@ export function* saveSteps(plan, context = {}) {
         }
         for (const note of outcome.noteEffects ?? []) {
             if (note.choiceGroup === "caster-option" && option !== null && note.option !== option) continue;
-            changes.push({ op: "effect", target, effect: { kind: "note", note } });
+            // (With the degree: a row that only says "As failure, but…" carries the failure's note — Calm's critical failure.)
+            changes.push({ op: "effect", target, effect: { kind: "note", note, degree } });
         }
         for (const native of outcome.nativeEffects ?? []) {
             const recipient = ["source", "caster", "self"].includes(native.recipient?.actor) && caster ? idOf(context, caster, -1) : target;

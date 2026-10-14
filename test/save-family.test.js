@@ -180,7 +180,7 @@ test("gaps name what the family doesn't model yet; note effects, PF2e spell effe
     const { context, io } = scene({ degrees: { a: "failure", b: "success" } });
     const changes = (await resolveSave(wall, context, io)).changes.filter((change) => change.op !== "damage");
     assert.deepEqual(changes, [
-        { op: "effect", target: "a", effect: { kind: "note", note: { label: "Hourly damage" } } },
+        { op: "effect", target: "a", effect: { kind: "note", note: { label: "Hourly damage" }, degree: "failure" } },
         { op: "effect", target: "a", effect: { kind: "native", uuid: "Compendium.pf2e.spell-effects.Item.x", label: "Spell Effect: X" } },
         { op: "note", audience: "gm", target: "a", text: "Move it 5 feet.", manual: true },
         { op: "note", audience: "gm", text: "Objects take it too." }
