@@ -30,3 +30,16 @@ test("stabilize: the dying target loses dying", () => {
     const result = registry.resolveSync(plan({ kind: "stabilize", stabilize: { sourceText: "The target loses the Dying condition" } }), context([{ id: "pc", side: "party" }]), {});
     assert.deepEqual(result.changes, [{ op: "end", target: "pc", what: { conditions: ["dying"], stabilize: true } }]);
 });
+
+test("affliction-care: a counteract (Dispel Magic, Clear Mind) and an affliction's stage (Cleanse Affliction) passed to the caller; a ward is a gap", () => {
+    const care = (resolution) => plan({ kind: "affliction-care", ...resolution });
+    const dispel = care({ recipient: "counteract-target", modes: [], operations: [{ op: "counteract", pick: 1, source: "spell-effect", traits: [], grantsConditions: [], otherTargets: true }] });
+    assert.deepEqual(registry.resolveSync(dispel, context([{ id: "foe", side: "foes" }]), {}).changes, [{ op: "effect", target: "foe", effect: { kind: "counteract", source: "spell-effect", grantsConditions: [], traits: [], pick: 1 } }]);
+    const clear = care({ recipient: "target", modes: [], operations: [{ op: "counteract", pick: 1, source: "effect", traits: [], grantsConditions: ["fleeing", "frightened", "stupefied"] }] });
+    assert.deepEqual(registry.resolveSync(clear, context([{ id: "pc", side: "party" }]), {}).changes[0].effect.grantsConditions, ["fleeing", "frightened", "stupefied"]);
+    const cleanse = care({ recipient: "target", modes: [], operations: [{ op: "reduce-affliction-stage", traits: ["curse", "disease", "poison"], pick: 1, by: 1, floor: 1 }] });
+    assert.deepEqual(registry.resolveSync(cleanse, context([{ id: "pc", side: "party" }]), {}).changes[0].effect, { kind: "affliction-stage", by: 1, floor: 1, traits: ["curse", "disease", "poison"], pick: 1 });
+    const { afflictionCareGaps } = { afflictionCareGaps: registry.familyFor("affliction-care").gaps };
+    assert.deepEqual(afflictionCareGaps(dispel), []);
+    assert.deepEqual(afflictionCareGaps(care({ recipient: "self", modes: [], operations: [{ op: "ward" }] })).map((gap) => gap.what), ["operation:ward"]);
+});
