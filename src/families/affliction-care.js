@@ -4,7 +4,8 @@
 //     → { op: "effect", effect: { kind: "counteract", source, grantsConditions, traits, pick } } — the caller picks what to
 //     counteract on the creature and rolls the counteract check, since only it knows what the creature has;
 //   reduce-affliction-stage (Cleanse Affliction) → { op: "effect", effect: { kind: "affliction-stage", by, floor, traits, pick } }.
-// A ward (Truesight, Spell Turning), a triggering spell or a choice of modes isn't resolved here: a gap.
+// A ward that sees through illusions (Truesight) → { op: "effect", effect: { kind: "true-sight", duration } } on the caster. Another ward
+// (Spell Turning), a triggering spell or a choice of modes isn't resolved here: a gap.
 
 import { drive } from "../drive.js";
 import { readPlan } from "../model/plan.js";
@@ -12,7 +13,7 @@ import { idOf, payloadGaps } from "./shared.js";
 
 export const AFFLICTION_CARE_KIND = "affliction-care";
 
-const RESOLVED = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "recipient", "modes", "operations", "native", "applications"]);
+const RESOLVED = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "recipient", "modes", "operations", "native", "applications", "ward"]);
 const RECIPIENTS = new Set(["counteract-target", "target", "self"]);
 
 export function afflictionCareGaps(plan) {
@@ -23,6 +24,8 @@ export function afflictionCareGaps(plan) {
     const operations = resolution.operations ?? [];
     if (!operations.length && !(resolution.modes ?? []).length) gaps.push({ path: "resolution.operations", what: "no operation" });
     for (const [index, operation] of operations.entries()) {
+        // (Truesight: a ward that sees through illusions — passed on as true-sight.)
+        if (operation?.op === "ward" && resolution.ward?.seeThrough) continue;
         if (!["counteract", "reduce-affliction-stage"].includes(operation?.op)) gaps.push({ path: `resolution.operations.${index}`, what: `operation:${operation?.op}` });
         else if (operation.op === "counteract" && !["spell-effect", "effect"].includes(operation.source)) gaps.push({ path: `resolution.operations.${index}.source`, what: `counteract:${operation.source}` });
     }
@@ -39,6 +42,8 @@ export function* afflictionCareSteps(plan, context = {}) {
         for (const operation of resolution.operations ?? []) {
             if (operation?.op === "counteract" && ["spell-effect", "effect"].includes(operation.source)) {
                 changes.push({ op: "effect", target, effect: { kind: "counteract", source: operation.source, grantsConditions: operation.grantsConditions ?? [], traits: operation.traits ?? [], pick: operation.pick ?? 1 } });
+            } else if (operation?.op === "ward" && resolution.ward?.seeThrough) {
+                changes.push({ op: "effect", target, effect: { kind: "true-sight", duration: resolution.ward.duration ?? null } });
             } else if (operation?.op === "reduce-affliction-stage") {
                 changes.push({ op: "effect", target, effect: { kind: "affliction-stage", by: Number(operation.by) || 1, floor: Number(operation.floor) || 1, traits: operation.traits ?? [], pick: operation.pick ?? 1 } });
             }

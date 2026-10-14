@@ -50,3 +50,10 @@ test("attack-ward (Sanctuary): the ward passed on to the target", () => {
     assert.deepEqual(result.changes, [{ op: "effect", target: "pc", effect: { kind: "attack-ward", ward: { save: "will", durationSeconds: 60, endsOnHostile: true, rows: { criticalSuccess: "ends", success: "may-attack-this-turn", failure: "wasted-this-turn", criticalFailure: "barred" } } } }]);
     assert.deepEqual(registry.familyFor("attack-ward").gaps(sanctuary), []);
 });
+
+test("affliction-care: Truesight's ward that sees through illusions, passed on as true-sight on the caster", () => {
+    const truesight = plan({ kind: "affliction-care", recipient: "self", modes: [], operations: [{ op: "ward" }], ward: { trigger: "Any illusion", secret: true, seeThrough: true, duration: { value: 10, unit: "minutes" } } });
+    const caster = { id: "caster", side: "party" };
+    assert.deepEqual(registry.resolveSync(truesight, { ...context([], caster) }, {}).changes, [{ op: "effect", target: "caster", effect: { kind: "true-sight", duration: { value: 10, unit: "minutes" } } }]);
+    assert.deepEqual(registry.familyFor("affliction-care").gaps(truesight), []);
+});
