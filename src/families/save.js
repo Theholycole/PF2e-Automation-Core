@@ -29,7 +29,7 @@ export const SAVE_KIND = "save";
 // Combat Simulator decides what of those it can model.
 const RESOLVED_PAYLOAD = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "casterChoice", "degreeAdjustment", "attackAdjustment", "heightenedVariants", "afflictionHandoff", "native"]);
 const NOTE_PAYLOAD = new Set(["reminders", "dataNotes", "temporaryImmunity"]);
-const RESOLVED_OUTCOME = new Set(["damage", "effects", "forcedMovement", "modifiers", "noteEffects", "nativeEffects", "manualInstructions", "followUps", "terminal", "affliction"]);
+const RESOLVED_OUTCOME = new Set(["damage", "effects", "forcedMovement", "modifiers", "noteEffects", "nativeEffects", "manualInstructions", "followUps", "terminal", "affliction", "conditionFloor"]);
 const TEXT_OUTCOME = new Set(["rawText", "semanticCoverage", "rowImmunityText", "inheritedDurationText", "rowNotes", "decisions"]);
 const CASTER_CHOICES = new Set(["damage-type", "option"]);
 
@@ -379,6 +379,9 @@ export function* saveSteps(plan, context = {}) {
             // (With the degree: a row that only says "As failure, but…" carries the failure's note — Calm's critical failure.)
             changes.push({ op: "effect", target, effect: { kind: "note", note, degree } });
         }
+        // (A condition the creature can't reduce below a value while it lasts — "The sickened value can't be reduced below 1 while the
+        // spell is active": passed on for the caller to keep.)
+        if (outcome.conditionFloor?.slug) changes.push({ op: "effect", target, effect: { kind: "floor", floor: outcome.conditionFloor } });
         for (const native of outcome.nativeEffects ?? []) {
             const recipient = ["source", "caster", "self"].includes(native.recipient?.actor) && caster ? idOf(context, caster, -1) : target;
             changes.push({ op: "effect", target: recipient, effect: { kind: "native", uuid: native.uuid, label: native.label ?? null } });

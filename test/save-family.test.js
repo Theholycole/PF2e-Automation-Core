@@ -128,6 +128,15 @@ test("a condition value the text rolls (Drained 1d4) is kept for the caller to r
     assert.equal(validateChanges(result.changes).length, 0);
 });
 
+test("a condition floor is passed on (Buzzing Bites: sickened can't go below 1 while the spell lasts)", async () => {
+    const floor = { slug: "sickened", value: 1, lifetime: "spell", liftedBy: null, situational: null };
+    const bites = plan("Bites", 4, { check: { statistic: "fortitude", basic: false, dcSource: "source-actor" }, sharedDamage: null, outcomes: degreeRows({ failure: { effects: [condition("sickened", 1)], conditionFloor: floor } }) });
+    assert.deepEqual(saveGaps(bites), []);
+    const { context, io } = scene({ degrees: { a: "failure", b: "success" } });
+    const result = await resolveSave(bites, context, io);
+    assert.deepEqual(result.changes.map((change) => change.op === "effect" ? change.effect : change.slug), ["sickened", { kind: "floor", floor }]);
+});
+
 test("decisions: a trait adjusts the degree by itself, otherwise the GM is asked; a pre-roll answer sets a modifier", async () => {
     const parch = plan("Parch", 1, {
         ...FEAR.resolution,
