@@ -43,3 +43,10 @@ test("affliction-care: a counteract (Dispel Magic, Clear Mind) and an affliction
     assert.deepEqual(afflictionCareGaps(dispel), []);
     assert.deepEqual(afflictionCareGaps(care({ recipient: "self", modes: [], operations: [{ op: "ward" }] })).map((gap) => gap.what), ["operation:ward"]);
 });
+
+test("attack-ward (Sanctuary): the ward passed on to the target", () => {
+    const sanctuary = plan({ kind: "attack-ward", attackWard: { save: "will", durationSeconds: 60, endsOnHostile: true, rows: { criticalSuccess: "ends", success: "may-attack-this-turn", failure: "wasted-this-turn", criticalFailure: "barred" } } });
+    const result = registry.resolveSync(sanctuary, context([{ id: "pc", side: "party" }]), {});
+    assert.deepEqual(result.changes, [{ op: "effect", target: "pc", effect: { kind: "attack-ward", ward: { save: "will", durationSeconds: 60, endsOnHostile: true, rows: { criticalSuccess: "ends", success: "may-attack-this-turn", failure: "wasted-this-turn", criticalFailure: "barred" } } } }]);
+    assert.deepEqual(registry.familyFor("attack-ward").gaps(sanctuary), []);
+});

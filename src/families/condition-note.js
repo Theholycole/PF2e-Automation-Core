@@ -100,3 +100,32 @@ export const stabilizeFamily = Object.freeze({
     resolve: (plan, context, io) => drive(stabilizeSteps(plan, context), io),
     gaps: stabilizeGaps
 });
+
+// "attack-ward" (Sanctuary): a ward on the target that creatures must save against before they attack it. The compiler's
+// resolution.attackWard = { save, durationSeconds, endsOnHostile, rows } is passed on as an effect for the caller to play, with the
+// spell's duration.
+export const ATTACK_WARD_KIND = "attack-ward";
+const WARD_RESOLVED = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "applications", "attackWard", "native"]);
+
+export function attackWardGaps(plan) {
+    const resolution = plan?.resolution ?? {};
+    const gaps = payloadGaps(resolution, WARD_RESOLVED);
+    if (!resolution.attackWard?.save) gaps.push({ path: "resolution.attackWard", what: "no save" });
+    return gaps;
+}
+
+export function* attackWardSteps(plan, context = {}) {
+    plan = readPlan(plan);
+    const ward = plan.resolution.attackWard ?? {};
+    const changes = (context.targets ?? []).map((actor, index) => ({ op: "effect", target: idOf(context, actor, index), effect: { kind: "attack-ward", ward: { save: ward.save ?? "will", durationSeconds: ward.durationSeconds ?? null, endsOnHostile: Boolean(ward.endsOnHostile), rows: ward.rows ?? {} } } }));
+    return { degrees: {}, changes, decisions: [], records: [], gaps: attackWardGaps(plan) };
+}
+
+export const attackWardFamily = Object.freeze({
+    kind: ATTACK_WARD_KIND,
+    module: "pf2e-resolution-core",
+    validate: () => [],
+    steps: attackWardSteps,
+    resolve: (plan, context, io) => drive(attackWardSteps(plan, context), io),
+    gaps: attackWardGaps
+});
