@@ -30,7 +30,8 @@ export const SAVE_KIND = "save";
 const RESOLVED_PAYLOAD = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "casterChoice", "degreeAdjustment", "attackAdjustment", "heightenedVariants", "afflictionHandoff", "native"]);
 const NOTE_PAYLOAD = new Set(["reminders", "dataNotes", "temporaryImmunity"]);
 const RESOLVED_OUTCOME = new Set(["damage", "effects", "forcedMovement", "modifiers", "noteEffects", "nativeEffects", "manualInstructions", "followUps", "terminal", "affliction", "conditionFloor"]);
-const TEXT_OUTCOME = new Set(["rawText", "semanticCoverage", "rowImmunityText", "inheritedDurationText", "rowNotes", "decisions"]);
+// (replacedLinks: the links live compiling replaced in the row's text — Calm's Spell Effect: Calm.)
+const TEXT_OUTCOME = new Set(["rawText", "semanticCoverage", "rowImmunityText", "inheritedDurationText", "rowNotes", "decisions", "replacedLinks"]);
 const CASTER_CHOICES = new Set(["damage-type", "option"]);
 
 const isEmpty = (value) => value === null || value === undefined || value === false || (Array.isArray(value) && !value.length) || (typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length);
