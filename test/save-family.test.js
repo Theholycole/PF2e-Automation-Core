@@ -344,3 +344,19 @@ test("a save's own penalty and a save rolled twice (2026-10-13): on the roll's o
     await resolveSave(curse, { ...context, targets: [context.targets[0]] }, watched);
     assert.deepEqual(seen, [{ statistic: "fortitude", modifier: 7, bonus: { value: -2, type: "circumstance" }, misfortune: false }, { statistic: "will", modifier: 6, bonus: null, misfortune: true }]);
 });
+
+test("damage against a creature with a trait only (Holy Light on an unholy target), at the row's multiplier; noRecurringSave is text", async () => {
+    const light = plan("Holy Light", 4, {
+        check: { statistic: "reflex", basic: true, dcSource: "source-actor" },
+        sharedDamage: { rollOnce: true, components: [{ id: "c", formula: "5d6", type: "fire", category: null }] },
+        conditionalDamage: [{ formula: "(5+2*(@item.rank - 3))d6[spirit]", damageType: "spirit", trait: "unholy" }],
+        outcomes: degreeRows({ failure: { damage: { mode: "shared", multiplier: 1, sourceComponentIds: ["c"] }, noRecurringSave: true }, success: { damage: { mode: "shared", multiplier: 0.5, sourceComponentIds: ["c"] } } })
+    });
+    assert.deepEqual(saveGaps(light), []);
+    const { context, io, creatures } = scene({ degrees: { a: "failure", b: "failure" }, damage: () => 10 });
+    creatures.b.traits = ["unholy"];
+    const result = await resolveSave(light, context, io);
+    const byTarget = (id) => result.changes.filter((change) => change.op === "damage" && change.target === id).flatMap((change) => change.instances.map((instance) => `${instance.type} ${instance.amount}`));
+    assert.deepEqual(byTarget("a"), ["fire 10"]);
+    assert.deepEqual(byTarget("b"), ["fire 10", "spirit 10"]);
+});

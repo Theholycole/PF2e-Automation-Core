@@ -27,11 +27,12 @@ export const SAVE_KIND = "save";
 // Note effects, PF2e spell effects and manual instructions become changes the
 // GM or PF2e carries out (effect kinds "note" and "native", manual notes); the
 // Combat Simulator decides what of those it can model.
-const RESOLVED_PAYLOAD = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "casterChoice", "degreeAdjustment", "attackAdjustment", "heightenedVariants", "afflictionHandoff", "native"]);
+const RESOLVED_PAYLOAD = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "casterChoice", "degreeAdjustment", "attackAdjustment", "heightenedVariants", "afflictionHandoff", "native", "conditionalDamage"]);
 const NOTE_PAYLOAD = new Set(["reminders", "dataNotes", "temporaryImmunity"]);
 const RESOLVED_OUTCOME = new Set(["damage", "effects", "forcedMovement", "modifiers", "noteEffects", "nativeEffects", "manualInstructions", "followUps", "terminal", "affliction", "conditionFloor"]);
 // (replacedLinks: the links live compiling replaced in the row's text — Calm's Spell Effect: Calm.)
-const TEXT_OUTCOME = new Set(["rawText", "semanticCoverage", "rowImmunityText", "inheritedDurationText", "rowNotes", "decisions", "replacedLinks"]);
+// (noRecurringSave: Confusion's critical failure, "with no save to end early" — a row's conditions have none unless they say so.)
+const TEXT_OUTCOME = new Set(["rawText", "semanticCoverage", "rowImmunityText", "inheritedDurationText", "rowNotes", "decisions", "replacedLinks", "noRecurringSave"]);
 const CASTER_CHOICES = new Set(["damage-type", "option"]);
 
 const isEmpty = (value) => value === null || value === undefined || value === false || (Array.isArray(value) && !value.length) || (typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length);
@@ -326,6 +327,16 @@ export function* saveSteps(plan, context = {}) {
             for (const id of shared.sourceComponentIds ?? []) {
                 const multiplier = shared.componentMultipliers?.[id] ?? shared.multiplier ?? damage.multiplier ?? 1;
                 for (const { instance, amount } of amounts.get(id) ?? []) rolled.push({ instance, amount: Math.floor(amount * multiplier), multiplier });
+            }
+        }
+        // (2026-10-14: damage only against a creature with a trait — Holy Light's extra spirit damage on an unholy target — at the row's
+        // multiplier.)
+        if (shared && (resolution.conditionalDamage ?? []).length) {
+            const traitsOf = context.traits?.(actor) ?? actor?.traits ?? [];
+            const multiplier = shared.multiplier ?? damage.multiplier ?? 1;
+            for (const entry of resolution.conditionalDamage) {
+                if (!entry?.formula || (entry.trait && !traitsOf.includes(entry.trait)) || !(multiplier > 0)) continue;
+                for (const { instance, amount } of yield* rollEach(parseDamage(String(entry.formula), { rank: castRank }))) rolled.push({ instance, amount: Math.floor(amount * multiplier), multiplier });
             }
         }
         if (damage.mode === "mixed" || damage.mode === "formulas") {
