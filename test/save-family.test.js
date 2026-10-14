@@ -116,6 +116,18 @@ test("conditions by degree, with their durations", async () => {
     ]);
 });
 
+test("a condition value the text rolls (Drained 1d4) is kept for the caller to roll", async () => {
+    const wails = plan("Wails", 9, {
+        check: { statistic: "fortitude", basic: false, dcSource: "source-actor" },
+        sharedDamage: null,
+        outcomes: degreeRows({ failure: { effects: [{ kind: "condition", slug: "drained", value: null, duration: null, valueRoll: "1d4" }] } })
+    });
+    const { context, io } = scene({ degrees: { a: "failure", b: "success" } });
+    const result = await resolveSave(wails, context, io);
+    assert.deepEqual(result.changes, [{ op: "condition", target: "a", slug: "drained", value: null, duration: null, valueRoll: "1d4" }]);
+    assert.equal(validateChanges(result.changes).length, 0);
+});
+
 test("decisions: a trait adjusts the degree by itself, otherwise the GM is asked; a pre-roll answer sets a modifier", async () => {
     const parch = plan("Parch", 1, {
         ...FEAR.resolution,
