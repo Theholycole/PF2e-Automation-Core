@@ -2,7 +2,10 @@
 // resolution.operations, on resolution.recipient ("counteract-target" and "target": the targets; "self": the caster):
 //   counteract (Dispel Magic: one spell effect; Clear Mind, Sound Body, Sure Footing: an effect that grants the listed conditions)
 //     → { op: "effect", effect: { kind: "counteract", source, grantsConditions, traits, pick } } — the caller picks what to
-//     counteract on the creature and rolls the counteract check, since only it knows what the creature has;
+//     counteract on the creature and rolls the counteract check, since only it knows what the creature has; its heightened
+//     entries at the cast rank add conditions (Clear Mind's 4th: confused, controlled, slowed) or let it counteract any (Empty
+//     Inside's 5th: any: true, no list); excludeTraits (not what a curse or disease gives) and nearMiss (a failure that would have
+//     succeeded at that many ranks higher sets the condition aside until the caster's next turn) are passed on;
 //   reduce-affliction-stage (Cleanse Affliction) → { op: "effect", effect: { kind: "affliction-stage", by, floor, traits, pick } }.
 // A ward that sees through illusions (Truesight) → { op: "effect", effect: { kind: "true-sight", duration } } on the caster. Another ward
 // (Spell Turning), a triggering spell or a choice of modes isn't resolved here: a gap.
@@ -13,12 +16,22 @@ import { idOf, payloadGaps } from "./shared.js";
 
 export const AFFLICTION_CARE_KIND = "affliction-care";
 
-const RESOLVED = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "recipient", "modes", "operations", "native", "applications", "ward"]);
+const RESOLVED = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "recipient", "modes", "operations", "native", "applications", "ward", "excludeTraits", "nearMiss", "normalStateNote", "heightened"]);
+const HEIGHTENED_CHANGES = new Set(["addCounteractConditions", "counteractAny"]);
+
+// The heightened entries at the cast rank: { add: [condition…], any }.
+function heightenedCounteract(heightened, castRank) {
+    const reached = (heightened ?? []).filter((entry) => Number(castRank) >= Number(entry?.rank));
+    const changes = reached.flatMap((entry) => entry.changes ?? []);
+    return { add: changes.flatMap((change) => change.addCounteractConditions ?? []), any: changes.some((change) => change.counteractAny) };
+}
 const RECIPIENTS = new Set(["counteract-target", "target", "self"]);
 
 export function afflictionCareGaps(plan) {
     const resolution = plan?.resolution ?? {};
     const gaps = payloadGaps(resolution, RESOLVED);
+    // (Heightened entries the family reads; another kind of change is a gap.)
+    if ((resolution.heightened ?? []).some((entry) => (entry?.changes ?? []).some((change) => !Object.keys(change ?? {}).every((key) => HEIGHTENED_CHANGES.has(key))))) gaps.push({ path: "resolution.heightened", what: "heightened" });
     if (!RECIPIENTS.has(resolution.recipient)) gaps.push({ path: "resolution.recipient", what: `recipient:${resolution.recipient}` });
     if ((resolution.modes ?? []).length) gaps.push({ path: "resolution.modes", what: "modes" });
     const operations = resolution.operations ?? [];
@@ -37,11 +50,14 @@ export function* afflictionCareSteps(plan, context = {}) {
     const resolution = plan.resolution;
     const recipients = resolution.recipient === "self" ? (context.caster ? [[context.caster, -1]] : []) : (context.targets ?? []).map((actor, index) => [actor, index]);
     const changes = [];
+    const lifted = heightenedCounteract(resolution.heightened, context.castRank ?? plan.rank);
     for (const [actor, index] of recipients) {
         const target = idOf(context, actor, index);
         for (const operation of resolution.operations ?? []) {
             if (operation?.op === "counteract" && ["spell-effect", "effect"].includes(operation.source)) {
-                changes.push({ op: "effect", target, effect: { kind: "counteract", source: operation.source, grantsConditions: operation.grantsConditions ?? [], traits: operation.traits ?? [], pick: operation.pick ?? 1 } });
+                const grantsConditions = lifted.any ? [] : [...new Set([...(operation.grantsConditions ?? []), ...lifted.add])];
+                changes.push({ op: "effect", target, effect: { kind: "counteract", source: operation.source, grantsConditions, traits: operation.traits ?? [], pick: operation.pick ?? 1,
+                    ...(lifted.any ? { any: true } : {}), ...((resolution.excludeTraits ?? []).length ? { excludeTraits: [...resolution.excludeTraits] } : {}), ...(resolution.nearMiss ? { nearMiss: resolution.nearMiss } : {}) } });
             } else if (operation?.op === "ward" && resolution.ward?.seeThrough) {
                 changes.push({ op: "effect", target, effect: { kind: "true-sight", duration: resolution.ward.duration ?? null } });
             } else if (operation?.op === "reduce-affliction-stage") {

@@ -44,6 +44,22 @@ test("affliction-care: a counteract (Dispel Magic, Clear Mind) and an affliction
     assert.deepEqual(afflictionCareGaps(care({ recipient: "self", modes: [], operations: [{ op: "ward" }] })).map((gap) => gap.what), ["operation:ward"]);
 });
 
+test("affliction-care: heightened counteracts (Clear Mind's added conditions, Empty Inside's any); excluded traits and a near miss passed on", () => {
+    const clear = plan({ kind: "affliction-care", recipient: "target", modes: [], operations: [{ op: "counteract", pick: 1, source: "effect", traits: [], grantsConditions: ["fleeing", "frightened", "stupefied"] }],
+        heightened: [{ rank: 4, changes: [{ addCounteractConditions: ["confused", "controlled", "slowed"] }] }, { rank: 6, changes: [{ addCounteractConditions: ["doomed"] }] }],
+        excludeTraits: ["curse", "disease"], nearMiss: { ranks: 2, setAside: { mode: "suppress", until: "caster-next-turn-start", pauseDuration: true } }, normalStateNote: "Not a natural state." });
+    const at = (castRank) => registry.resolveSync(clear, { ...context([{ id: "pc", side: "party" }]), castRank }, {}).changes[0].effect;
+    assert.deepEqual(at(2).grantsConditions, ["fleeing", "frightened", "stupefied"]);
+    assert.deepEqual(at(4).grantsConditions, ["fleeing", "frightened", "stupefied", "confused", "controlled", "slowed"]);
+    assert.deepEqual(at(6).grantsConditions.slice(-1), ["doomed"]);
+    assert.deepEqual([at(2).excludeTraits, at(2).nearMiss.ranks], [["curse", "disease"], 2]);
+    assert.deepEqual(registry.familyFor("affliction-care").gaps(clear), []);
+    const empty = plan({ kind: "affliction-care", recipient: "target", modes: [], operations: [{ op: "counteract", pick: 1, source: "effect", traits: [], grantsConditions: ["frightened"] }], heightened: [{ rank: 5, changes: [{ counteractAny: true }] }] });
+    const any = registry.resolveSync(empty, { ...context([{ id: "pc", side: "party" }]), castRank: 5 }, {}).changes[0].effect;
+    assert.deepEqual([any.any, any.grantsConditions], [true, []]);
+    assert.deepEqual(registry.familyFor("affliction-care").gaps({ ...empty, resolution: { ...empty.resolution, heightened: [{ rank: 5, changes: [{ somethingElse: 1 }] }] } }).map((gap) => gap.what), ["heightened"]);
+});
+
 test("attack-ward (Sanctuary): the ward passed on to the target", () => {
     const sanctuary = plan({ kind: "attack-ward", attackWard: { save: "will", durationSeconds: 60, endsOnHostile: true, rows: { criticalSuccess: "ends", success: "may-attack-this-turn", failure: "wasted-this-turn", criticalFailure: "barred" } } });
     const result = registry.resolveSync(sanctuary, context([{ id: "pc", side: "party" }]), {});
