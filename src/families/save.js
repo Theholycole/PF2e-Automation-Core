@@ -61,7 +61,8 @@ export function saveGaps(plan) {
     if (resolution.casterChoice && !CASTER_CHOICES.has(resolution.casterChoice.kind)) gaps.push({ path: "resolution.casterChoice", what: `casterChoice:${resolution.casterChoice.kind}` });
     const check = resolution.check;
     const skillCheck = (check?.roll === "skill" || check?.roll === "perception") && check.statistic && check.against?.statistic;
-    if (!check || !(SAVES.includes(check.statistic) || check.statistic === "spell-attack" || check.statistic === "strike" || skillCheck)) gaps.push({ path: "resolution.check", what: "check" });
+    // (2026-10-15, asked by the item module: "automatic" — no roll, the success row — is resolved by saveSteps; before, it was reported as a gap.)
+    if (!check || !(SAVES.includes(check.statistic) || check.statistic === "spell-attack" || check.statistic === "strike" || skillCheck || check.roll === "automatic")) gaps.push({ path: "resolution.check", what: "check" });
     for (const degree of DEGREES) {
         const outcome = resolution.outcomes?.[degree];
         if (!outcome) continue;

@@ -150,3 +150,15 @@ test("a check with a fixed modifier of its own: that, plus the context's adjustm
     registry.resolveSync(plan, { caster: { id: "thug" }, targets: [{ id: "fighter" }], statistic }, { roll: (slug, options) => (asked.push([slug, options.modifier, options.dc]), { degree: "success" }), damage: () => 0 });
     assert.deepEqual(asked, [["test-capture", 11, 22]]);
 });
+
+test("an automatic check (no roll, the success row) is resolved and isn't a gap or a skeleton issue (2026-10-15, the item module)", async () => {
+    const { validateSkeleton } = await import("../src/index.js");
+    const registry = createRegistry();
+    for (const family of CORE_FAMILIES) registry.registerFamily(family);
+    const drink = { modelVersion: 13, source: { name: "Test Elixir" }, rank: 1, traits: [],
+        resolution: { kind: "check", check: { roll: "automatic", statistic: "automatic" }, sharedDamage: null, outcomes: { criticalSuccess: none, success: { ...none, effects: [{ kind: "condition", slug: "concealed", value: null, duration: { mode: "fixed", value: 5, unit: "minutes" } }] }, failure: none, criticalFailure: none } } };
+    assert.deepEqual(registry.familyFor("check").gaps(drink), []);
+    assert.deepEqual(validateSkeleton(drink).filter((issue) => issue.path === "resolution.check.roll"), []);
+    const result = registry.resolveSync(drink, { caster: { id: "pc" }, targets: [{ id: "pc" }] }, {});
+    assert.deepEqual(result.changes.map((change) => [change.op, change.target, change.slug]), [["condition", "pc", "concealed"]]);
+});
