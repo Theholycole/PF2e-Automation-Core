@@ -8,6 +8,7 @@ import * as runtimeUtils from "./runtime-utils.js";
 import * as textPatterns from "../src/text/text-patterns.js";
 import { installEarlyPatches, installPatches, patchesApi } from "./patches.js";
 import * as forcedMovement from "./forced-movement.js";
+import * as dying from "./dying-recovery.js";
 
 export const CORE_ID = "pf2e-resolution-core";
 
@@ -22,7 +23,9 @@ const api = Object.freeze({
     runtimeUtils,
     textPatterns,
     // Pushes and pulls (the user's grid rule, 2026-10-05).
-    forcedMovement
+    forcedMovement,
+    // Coming back from Dying after healing (2026-10-15): isDying, recoverFromDying, revivedNote.
+    dying
 });
 
 // Content modules register families and providers in their own "init" hooks;
