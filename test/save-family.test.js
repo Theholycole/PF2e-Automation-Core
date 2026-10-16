@@ -271,6 +271,20 @@ test("the sync driver: the planner can force a degree and use average damage; a 
     assert.throws(() => resolveSaveSync(FIREBALL, context, { roll: async () => ({ degree: "failure" }) }), /use drive/);
 });
 
+test("a damage material (PF2e's materialDamageEffects) is kept: from the formula's flavor or the component's own, on the damage changes", () => {
+    assert.deepEqual(parseDamage("3d8[fire,silver]").map((instance) => [instance.type, instance.materials]), [["fire", ["silver"]]]);
+    assert.deepEqual(parseDamage("1d4[persistent,fire,cold-iron]").map((instance) => [instance.category, instance.type, instance.materials]), [["persistent", "fire", ["cold-iron"]]]);
+    assert.equal(parseDamage("2d6[slashing]")[0].materials, undefined, "none: the instance as before");
+    assert.deepEqual(parseDamage("2d6[sovereign-steel,slashing]")[0].type, "slashing", "a material isn't a type");
+    const { context } = scene({ degrees: {} });
+    const silvered = plan("Silver Fire", 3, { ...FIREBALL.resolution, sharedDamage: { ...FIREBALL.resolution.sharedDamage, components: [{ id: "0", formula: "6d6[fire,silver]", type: "fire", category: null }] } });
+    const failed = resolveSaveSync(silvered, context, { roll: () => ({ degree: "failure" }) });
+    assert.deepEqual(failed.changes[0].instances[0].materials, ["silver"]);
+    const ironed = plan("Iron Fire", 3, { ...FIREBALL.resolution, sharedDamage: { ...FIREBALL.resolution.sharedDamage, components: [{ id: "0", formula: "6d6", type: "fire", category: null, materials: ["cold-iron"] }] } });
+    assert.deepEqual(resolveSaveSync(ironed, context, { roll: () => ({ degree: "failure" }) }).changes[0].instances[0].materials, ["cold-iron"]);
+    assert.equal(resolveSaveSync(FIREBALL, context, { roll: () => ({ degree: "failure" }) }).changes[0].instances[0].materials, undefined);
+});
+
 test("persistent damage in a basic save's shared damage says when the save halved or doubled it", () => {
     const registry = createRegistry();
     for (const family of CORE_FAMILIES) registry.registerFamily(family);

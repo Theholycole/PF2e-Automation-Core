@@ -105,7 +105,9 @@ export function heightenedAt(plan, castRank) {
 export function sharedComponentsAt(sharedDamage, baseRank, castRank, { typeOverride = null, componentTypes = null } = {}) {
     if (!sharedDamage?.components?.length) return [];
     const retype = (instances) => (typeOverride ? instances.map((instance) => (typeOverride.from.includes(instance.type) || instance.type === "untyped" ? { ...instance, type: typeOverride.to } : instance)) : instances);
-    const chosen = (component, instances) => (componentTypes?.[component.id] ? instances.map((instance) => ({ ...instance, type: componentTypes[component.id] })) : instances);
+    // (A component's own materials — PF2e's damage partial's — on its instances, beside those its formula's flavor names.)
+    const materialsOf = (component, instances) => ((component.materials ?? []).length ? instances.map((instance) => ({ ...instance, materials: [...new Set([...(instance.materials ?? []), ...component.materials])] })) : instances);
+    const chosen = (component, instances) => materialsOf(component, componentTypes?.[component.id] ? instances.map((instance) => ({ ...instance, type: componentTypes[component.id] })) : instances);
     // Damage read from the text (mode "formula"): its formula carries the rank
     // scaling, one pool per component (as the spell module's text damage reads it).
     if (sharedDamage.mode === "formula" && sharedDamage.formula) {
@@ -157,7 +159,7 @@ function persistentChange(target, instance, amount, multiplier = 1) {
         target,
         slug: "persistent-damage",
         value: null,
-        damage: { type: instance.type, dice: instance.dice, constant: instance.constant, amount, ...(multiplier !== 1 ? { multiplier } : {}) }
+        damage: { type: instance.type, dice: instance.dice, constant: instance.constant, amount, ...(multiplier !== 1 ? { multiplier } : {}), ...(instance.materials?.length ? { materials: instance.materials } : {}) }
     };
 }
 
@@ -168,7 +170,7 @@ function damageChanges(target, rolled) {
     const immediate = [];
     for (const { instance, amount, multiplier } of rolled) {
         if (instance.category === "persistent") changes.push(persistentChange(target, instance, amount, multiplier));
-        else if (amount > 0) immediate.push({ type: instance.type, category: instance.category, amount });
+        else if (amount > 0) immediate.push({ type: instance.type, category: instance.category, amount, ...(instance.materials?.length ? { materials: instance.materials } : {}) });
     }
     if (immediate.length) changes.unshift({ op: "damage", target, instances: immediate });
     return changes;

@@ -50,8 +50,8 @@ export function* directDamageSteps(plan, context = {}) {
             const rolled = yield* rollEach(instances);
             const entry = byTarget.get(target) ?? new Map();
             for (const { instance, amount } of rolled) {
-                const key = `${instance.type}|${instance.category ?? ""}`;
-                entry.set(key, { type: instance.type, category: instance.category ?? null, amount: (entry.get(key)?.amount ?? 0) + amount });
+                const key = `${instance.type}|${instance.category ?? ""}|${(instance.materials ?? []).join(",")}`;
+                entry.set(key, { type: instance.type, category: instance.category ?? null, amount: (entry.get(key)?.amount ?? 0) + amount, ...(instance.materials?.length ? { materials: instance.materials } : {}) });
             }
             byTarget.set(target, entry);
         }

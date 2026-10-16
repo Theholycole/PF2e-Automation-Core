@@ -2,7 +2,7 @@
 // "1d4[persistent,fire]", "(2d6+4)[fire]", "(@item.level)d4[bleed]",
 // "(ternary(gte(@item.rank,10),115,100))[void]".
 //
-// parseDamage(formula, { rank }) → instances [{ type, category, dice: [{ count, die, factor }], constant }]
+// parseDamage(formula, { rank }) → instances [{ type, category, dice: [{ count, die, factor }], constant, materials? }]
 // An instance is worth Σ factor × (count d die) + constant. Its type and
 // category come from the formula's flavor ("[persistent,fire]") or from the
 // defaults the caller gives (a spell component's own type).
@@ -10,8 +10,11 @@
 const CATEGORIES = new Set(["persistent", "precision", "splash"]);
 // Bleed is always persistent damage.
 const ALWAYS_PERSISTENT = new Set(["bleed"]);
+// The precious materials damage can carry (PF2e's CONFIG.PF2E.materialDamageEffects): kept as the instance's materials, which a
+// weakness or resistance to the material reads ("3d8[fire,silver]": damage treated as silver).
+export const DAMAGE_MATERIALS = Object.freeze(new Set(["abysium", "adamantine", "cold-iron", "dawnsilver", "djezet", "duskwood", "inubrix", "keep-stone", "noqual", "orichalcum", "peachwood", "siccatite", "silver", "sisterstone-dusk", "sisterstone-scarlet", "sovereign-steel", "warpglass"]));
 // Flavor words that are neither a type nor a category (materials, traits).
-const IGNORED_FLAVOR = new Set(["adamantine", "cold-iron", "silver", "orichalcum", "mithral", "dawnsilver", "duskwood", "sisterstone", "abysium", "djezet", "inubrix", "noqual", "peachwood", "siccatite", "magical", "nonlethal", "area-damage"]);
+const IGNORED_FLAVOR = new Set([...DAMAGE_MATERIALS, "mithral", "sisterstone", "magical", "nonlethal", "area-damage"]);
 
 const FUNCTIONS = {
     ternary: (condition, a, b) => (condition ? a : b),
@@ -185,12 +188,14 @@ function parser(tokens, variables) {
 function readFlavor(flavor, defaults) {
     let type = defaults.type ?? "untyped";
     let category = defaults.category ?? null;
+    const materials = [];
     for (const word of flavor ?? []) {
         if (CATEGORIES.has(word)) category = word;
+        else if (DAMAGE_MATERIALS.has(word)) materials.push(word);
         else if (!IGNORED_FLAVOR.has(word)) type = word;
     }
     if (ALWAYS_PERSISTENT.has(type)) category = "persistent";
-    return { type, category };
+    return { type, category, ...(materials.length ? { materials: [...new Set(materials)] } : {}) };
 }
 
 // The variables a spell's formulas use, at the rank it's cast.
