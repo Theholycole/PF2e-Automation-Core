@@ -178,6 +178,8 @@ The simulator applies what it can model (damage, healing, temporary HP, conditio
 
 Damage materials (2026-10-16, for the item module's "treated as silver"): a damage formula's flavor words in PF2e's `CONFIG.PF2E.materialDamageEffects` ("3d8[fire,silver]") and a component's own `materials` are kept on the parsed instance as `materials`, and a `damage` change's instance (or a `persistent-damage` condition's `damage`) carries them. An instance without one has no `materials` field, as before. Live play writes them back into the roll's flavor; the simulator weighs a weakness or resistance to them.
 
+A target's Perception against a fixed DC (2026-10-16, the item module's Mercurial Mantle: "the target attempts a @Check[perception|dc:38] check"): `check { roll: "save", statistic: "perception", against: { dc: "fixed", value } }`, rolled as a save is — the target's statistic against the DC. Only with a fixed DC.
+
 Additions for the skill actions (milestone 3, 2026-10-08):
 - A `condition` change can carry `scope: { attacker, attacks: "any" | "melee", uses }`: off-guard only to that creature's attacks, for that many of them (`null`: every one while it lasts). Used by Feint and Create a Diversion.
 - An `effect` change of kind `disarm` (`{ kind: "disarm", what: "drop" | "weaken", penalty }`) knocks a held item away or weakens the grip on it.

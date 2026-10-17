@@ -62,7 +62,10 @@ export function saveGaps(plan) {
     const check = resolution.check;
     const skillCheck = (check?.roll === "skill" || check?.roll === "perception") && check.statistic && check.against?.statistic;
     // (2026-10-15, asked by the item module: "automatic" — no roll, the success row — is resolved by saveSteps; before, it was reported as a gap.)
-    if (!check || !(SAVES.includes(check.statistic) || check.statistic === "spell-attack" || check.statistic === "strike" || skillCheck || check.roll === "automatic")) gaps.push({ path: "resolution.check", what: "check" });
+    // (2026-10-16, the item module's Mercurial Mantle: "the target attempts a @Check[perception|dc:38] check" — the target's Perception against a
+    // fixed DC, rolled as a save is.)
+    const perceptionSave = check?.roll === "save" && check.statistic === "perception" && check.against?.dc === "fixed";
+    if (!check || !(SAVES.includes(check.statistic) || check.statistic === "spell-attack" || check.statistic === "strike" || skillCheck || perceptionSave || check.roll === "automatic")) gaps.push({ path: "resolution.check", what: "check" });
     for (const degree of DEGREES) {
         const outcome = resolution.outcomes?.[degree];
         if (!outcome) continue;

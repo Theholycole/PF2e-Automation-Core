@@ -374,3 +374,15 @@ test("damage against a creature with a trait only (Holy Light on an unholy targe
     assert.deepEqual(byTarget("a"), ["fire 10"]);
     assert.deepEqual(byTarget("b"), ["fire 10", "spirit 10"]);
 });
+
+test("a target's Perception check against a fixed DC, rolled as a save (Mercurial Mantle's Cunning Dodge): no gap, the target's Perception rolled", () => {
+    const plan = { modelVersion: 13, source: { name: "Test Mantle" }, rank: 1, resolution: { kind: "save", check: { roll: "save", statistic: "perception", against: { dc: "fixed", value: 38 } }, outcomes: degreeRows({ failure: { effects: [{ kind: "condition", slug: "off-guard", value: null, duration: null }] } }) } };
+    assert.deepEqual(saveGaps(plan), []);
+    assert.equal(saveGaps({ ...plan, resolution: { ...plan.resolution, check: { roll: "save", statistic: "perception", against: { dc: "source" } } } }).length, 1, "a fixed DC only");
+    const { context } = scene({ degrees: {} });
+    context.targets[0].perception = { modifier: 11 };
+    context.targets.length = 1;
+    const calls = [];
+    resolveSaveSync(plan, context, { roll: (statistic, options) => { calls.push([statistic, options.actor.id, options.modifier, options.dc]); return { degree: "failure" }; } });
+    assert.deepEqual(calls, [["perception", "a", 11, 38]]);
+});
