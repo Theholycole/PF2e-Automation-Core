@@ -67,6 +67,20 @@ test("attack-ward (Sanctuary): the ward passed on to the target", () => {
     assert.deepEqual(registry.familyFor("attack-ward").gaps(sanctuary), []);
 });
 
+test("image-decoys (Mirror Image): the images passed on to the caster, a color table with them (Chromatic Image)", () => {
+    const chances = { 3: { die: 4, max: 1, sourceText: "If all three images remain" }, 2: { die: 6, max: 2, sourceText: "With two" }, 1: { die: 6, max: 3, sourceText: "With only one" } };
+    const mirror = plan({ kind: "image-decoys", imageDecoys: { images: 3, chances, durationSeconds: 60, effect: { uuid: "Compendium.pf2e.spell-effects.Item.x", label: "Spell Effect: Mirror Image" } } });
+    const caster = { id: "wizard", side: "party" };
+    const result = registry.resolveSync(mirror, context([], caster), {});
+    assert.deepEqual(result.changes, [{ op: "effect", target: "wizard", effect: { kind: "image-decoys", decoys: { images: 3, chances: { 1: { die: 6, max: 3 }, 2: { die: 6, max: 2 }, 3: { die: 4, max: 1 } }, durationSeconds: 60 } } }]);
+    assert.deepEqual(registry.familyFor("image-decoys").gaps(mirror), []);
+    const colors = { die: 4, rows: [{ face: 1, label: "Red", damage: ["5[fire]", "5[mental]"] }] };
+    const chromatic = plan({ kind: "image-decoys", imageDecoys: { images: 3, chances, durationSeconds: 60, colors } });
+    assert.deepEqual(registry.resolveSync(chromatic, context([], caster), {}).changes[0].effect.decoys.colors, colors);
+    // (A chance missing for a count of images: a gap.)
+    assert.deepEqual(registry.familyFor("image-decoys").gaps(plan({ kind: "image-decoys", imageDecoys: { images: 3, chances: { 3: chances[3] } } })).map((gap) => gap.what), ["no images"]);
+});
+
 test("affliction-care: Truesight's ward that sees through illusions, passed on as true-sight on the caster", () => {
     const truesight = plan({ kind: "affliction-care", recipient: "self", modes: [], operations: [{ op: "ward" }], ward: { trigger: "Any illusion", secret: true, seeThrough: true, duration: { value: 10, unit: "minutes" } } });
     const caster = { id: "caster", side: "party" };

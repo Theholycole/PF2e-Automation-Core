@@ -129,3 +129,34 @@ export const attackWardFamily = Object.freeze({
     resolve: (plan, context, io) => drive(attackWardSteps(plan, context), io),
     gaps: attackWardGaps
 });
+
+// "image-decoys" (Mirror Image; Chromatic Image's colors, 2026-10-21 for the Combat Simulator): illusory images in the caster's space that
+// take attacks meant for it. The compiler's resolution.imageDecoys = { images, chances: { <images left>: { die, max } }, durationSeconds,
+// effect, colors? } is passed on as an effect on the caster for the caller to play (live play keeps the spell module's own controls).
+export const IMAGE_DECOYS_KIND = "image-decoys";
+const DECOYS_RESOLVED = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "applications", "imageDecoys", "native"]);
+
+export function imageDecoysGaps(plan) {
+    const resolution = plan?.resolution ?? {};
+    const gaps = payloadGaps(resolution, DECOYS_RESOLVED);
+    const decoys = resolution.imageDecoys;
+    if (!(Number(decoys?.images) > 0) || !Array.from({ length: Number(decoys?.images) || 0 }, (_, index) => decoys.chances?.[index + 1]).every((chance) => chance?.die > 0 && chance.max > 0)) gaps.push({ path: "resolution.imageDecoys", what: "no images" });
+    return gaps;
+}
+
+export function* imageDecoysSteps(plan, context = {}) {
+    plan = readPlan(plan);
+    const decoys = plan.resolution.imageDecoys ?? {};
+    const chances = Object.fromEntries(Object.entries(decoys.chances ?? {}).map(([count, chance]) => [count, { die: chance.die, max: chance.max }]));
+    const changes = context.caster ? [{ op: "effect", target: idOf(context, context.caster, -1), effect: { kind: "image-decoys", decoys: { images: decoys.images, chances, durationSeconds: decoys.durationSeconds ?? null, ...(decoys.colors ? { colors: structuredClone(decoys.colors) } : {}) } } }] : [];
+    return { degrees: {}, changes, decisions: [], records: [], gaps: imageDecoysGaps(plan) };
+}
+
+export const imageDecoysFamily = Object.freeze({
+    kind: IMAGE_DECOYS_KIND,
+    module: "pf2e-resolution-core",
+    validate: () => [],
+    steps: imageDecoysSteps,
+    resolve: (plan, context, io) => drive(imageDecoysSteps(plan, context), io),
+    gaps: imageDecoysGaps
+});
