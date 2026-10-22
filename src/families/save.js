@@ -402,7 +402,8 @@ export function* saveSteps(plan, context = {}) {
         if (outcome.conditionFloor?.slug) changes.push({ op: "effect", target, effect: { kind: "floor", floor: outcome.conditionFloor } });
         for (const native of outcome.nativeEffects ?? []) {
             const recipient = ["source", "caster", "self"].includes(native.recipient?.actor) && caster ? idOf(context, caster, -1) : target;
-            changes.push({ op: "effect", target: recipient, effect: { kind: "native", uuid: native.uuid, label: native.label ?? null } });
+            // (With the degree, as a note's: an effect whose ChoiceSet is the degree of success — Ill Omen's, Leaden Steps' — takes that choice.)
+            changes.push({ op: "effect", target: recipient, effect: { kind: "native", uuid: native.uuid, label: native.label ?? null, degree } });
         }
         for (const instruction of outcome.manualInstructions ?? []) {
             const text = typeof instruction === "string" ? instruction : instruction?.text;
