@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { categoryDice, soakedTemperature, temperatureFromFahrenheit } from "../src/environment/catalog.js";
 import { AQUATIC_COMBAT, CONCEALED, OFF_GUARD, creatureEffect, effectiveWeather, feltTemperature, flatCheckFor, normalizeState, rangedInWind, sceneMovementCosts } from "../src/environment/weather.js";
 import { boundaries, clockDamage, fatigueHours, lightningChances, turnStartDamage } from "../src/environment/ticks.js";
-import { bandDC, disasterCard, fallingDamage } from "../src/environment/disasters.js";
+import { bandDC, disasterCard, easedFall, fallingDamage } from "../src/environment/disasters.js";
 import { PF2E_FEATURES, featureRules, goesUp, ignoresFeature, sureFooted } from "../src/environment/terrain.js";
 
 const rule = (effect, key, slug) => effect.rules.find((entry) => entry.key === key && (!slug || entry.slug === slug));
@@ -163,6 +163,11 @@ test("disasters: an avalanche buries all but a critical success; pyroclastic flo
     assert.equal(bandDC(["expert", "legendary"]), 30);
     assert.equal(bandDC(["untrained", "trained"]), 10);
     assert.equal(fallingDamage(25), 12);
+    assert.equal(fallingDamage(5), 0, "5 feet or less: no damage");
+    assert.deepEqual(easedFall(60), { feet: 60, damage: 30, prone: true, by: null });
+    assert.deepEqual(easedFall(150, [{ shorter: 120, source: "Tumbler's Belt" }, { shorter: 30, source: "Talisman" }]), { feet: 30, damage: 15, prone: true, by: "Tumbler's Belt" });
+    assert.deepEqual(easedFall(100, [{ shorter: 120, source: "Tumbler's Belt" }]), { feet: 0, damage: 0, prone: false, by: "Tumbler's Belt" });
+    assert.deepEqual(easedFall(100, [{ shorter: 10 }, { noDamage: true, source: "Dragonaut's Wingsuit" }]), { feet: 0, damage: 0, prone: false, by: "Dragonaut's Wingsuit" });
 });
 
 test("terrain: ice is difficult uneven ground, heavy undergrowth gives cover, lava burns each turn", () => {

@@ -58,5 +58,18 @@ export function disasterCard(key, options = {}) {
 // The categories a disaster offers, for the GM's select: [{ key, label, min, max, dice }].
 export const disasterCategories = (key) => (DISASTERS[key]?.categories ?? []).map((category) => ({ key: category, ...DAMAGE_CATEGORIES[category] }));
 
-// Falling damage: half the distance fallen, bludgeoning (Player Core).
-export const fallingDamage = (feet) => Math.floor(Math.max(0, Number(feet) || 0) / 2);
+// Falling damage: half the distance fallen, bludgeoning, for a fall of more than 5 feet (Player Core).
+export const fallingDamage = (feet) => (Number(feet) > 5 ? Math.floor(Number(feet) / 2) : 0);
+
+// A fall after what eases it (2026-10-25, with the item module's session: a Tumbler's Belt's "120 feet shorter", a Dragonaut's Wingsuit's
+// no damage): eases [{ shorter?: feet, noDamage?: true, source }] — none at all for one that takes no damage from it, else the largest
+// shorter off (they don't add). { feet, damage, prone (it lands prone only when the fall hurts it), by }.
+export function easedFall(feet, eases = []) {
+    const list = (eases ?? []).filter(Boolean);
+    const soft = list.find((entry) => entry.noDamage);
+    if (soft) return { feet: 0, damage: 0, prone: false, by: soft.source ?? null };
+    const best = list.reduce((most, entry) => (Number(entry.shorter) > (Number(most?.shorter) || 0) ? entry : most), null);
+    const left = Math.max(0, (Number(feet) || 0) - (Number(best?.shorter) || 0));
+    const damage = fallingDamage(left);
+    return { feet: left, damage, prone: damage > 0, by: best ? best.source ?? null : null };
+}
