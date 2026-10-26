@@ -159,7 +159,7 @@ The simulator implements them on its range bands. The live layer implements them
 ```js
 Change =
   | { op: "damage", target, instances }            | { op: "heal", target, amount }
-  | { op: "tempHp", target, amount }                | { op: "condition", target, slug, value, duration }
+  | { op: "tempHp", target, amount, duration?, fromDamage? } | { op: "condition", target, slug, value, duration }
   | { op: "effect", target, effect }                | { op: "end", target, what }          // end an effect or spell (counteract, dismiss)
   | { op: "item", action: "create" | "update" | "delete", target, data }   // incl. rule patches, duration swaps, conjured items
   | { op: "move", target, kind: "push" | "pull" | "stride", distance }

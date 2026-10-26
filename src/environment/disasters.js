@@ -64,15 +64,23 @@ export const fallingDamage = (feet) => (Number(feet) > 5 ? Math.floor(Number(fee
 // A fall after what eases it (2026-10-25, with the item module's session: a Tumbler's Belt's "120 feet shorter", a Dragonaut's Wingsuit's
 // no damage): eases [{ shorter?: feet, noDamage?: true, landsOnFeet?: true, source }] — none at all for one that takes no damage from it,
 // else the largest shorter off (they don't add); it lands prone only when the fall hurts it and nothing lands it on its feet (a Tumbler's
-// Belt's, 2026-10-26). { feet, damage, prone, by }.
+// Belt's, 2026-10-26). Then damage taken off (2026-10-26, an Impact Foam Chassis's "decreases the falling damage by up to the listed
+// amount" for a fall "at least 10 feet"): { reduceBy, minFeet?, itemUuid?, source } — the largest one for a fall at least minFeet long, up
+// to the damage left. { feet, damage (after them all), before (the damage before reduceBy), prone, by, reductions: [{ source, itemUuid,
+// amount }] }.
 export function easedFall(feet, eases = []) {
     const list = (eases ?? []).filter(Boolean);
     const soft = list.find((entry) => entry.noDamage);
-    if (soft) return { feet: 0, damage: 0, prone: false, by: soft.source ?? null };
+    if (soft) return { feet: 0, damage: 0, before: 0, prone: false, by: soft.source ?? null, reductions: [] };
     const best = list.reduce((most, entry) => (Number(entry.shorter) > (Number(most?.shorter) || 0) ? entry : most), null);
     const left = Math.max(0, (Number(feet) || 0) - (Number(best?.shorter) || 0));
-    const damage = fallingDamage(left);
+    const before = fallingDamage(left);
+    const fallen = Number(feet) || 0;
+    const reducer = list.filter((entry) => Number(entry.reduceBy) > 0 && fallen >= (Number(entry.minFeet) || 0)).reduce((most, entry) => (Number(entry.reduceBy) > (Number(most?.reduceBy) || 0) ? entry : most), null);
+    const amount = reducer ? Math.min(before, Math.floor(Number(reducer.reduceBy))) : 0;
+    const reductions = amount > 0 ? [{ source: reducer.source ?? null, itemUuid: reducer.itemUuid ?? null, amount }] : [];
+    const damage = before - amount;
     const feetFirst = list.find((entry) => entry.landsOnFeet);
-    const by = [best?.source, feetFirst && feetFirst !== best ? feetFirst.source : null].filter(Boolean).join(", ") || null;
-    return { feet: left, damage, prone: damage > 0 && !feetFirst, by };
+    const by = [...new Set([best?.source, amount > 0 ? reducer.source : null, feetFirst ? feetFirst.source : null].filter(Boolean))].join(", ") || null;
+    return { feet: left, damage, before, prone: damage > 0 && !feetFirst, by, reductions };
 }

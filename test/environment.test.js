@@ -184,12 +184,19 @@ test("disasters: an avalanche buries all but a critical success; pyroclastic flo
     assert.equal(bandDC(["untrained", "trained"]), 10);
     assert.equal(fallingDamage(25), 12);
     assert.equal(fallingDamage(5), 0, "5 feet or less: no damage");
-    assert.deepEqual(easedFall(60), { feet: 60, damage: 30, prone: true, by: null });
-    assert.deepEqual(easedFall(150, [{ shorter: 120, source: "Tumbler's Belt" }, { shorter: 30, source: "Talisman" }]), { feet: 30, damage: 15, prone: true, by: "Tumbler's Belt" });
-    assert.deepEqual(easedFall(100, [{ shorter: 120, source: "Tumbler's Belt" }]), { feet: 0, damage: 0, prone: false, by: "Tumbler's Belt" });
-    assert.deepEqual(easedFall(100, [{ shorter: 10 }, { noDamage: true, source: "Dragonaut's Wingsuit" }]), { feet: 0, damage: 0, prone: false, by: "Dragonaut's Wingsuit" });
-    assert.deepEqual(easedFall(160, [{ shorter: 120, landsOnFeet: true, source: "Tumbler's Belt" }]), { feet: 40, damage: 20, prone: false, by: "Tumbler's Belt" }, "hurt, but on its feet");
-    assert.deepEqual(easedFall(60, [{ shorter: 25, source: "Gliding Membranes" }, { landsOnFeet: true, source: "Belt" }]), { feet: 35, damage: 17, prone: false, by: "Gliding Membranes, Belt" });
+    assert.deepEqual(easedFall(60), { feet: 60, damage: 30, before: 30, prone: true, by: null, reductions: [] });
+    assert.deepEqual(easedFall(150, [{ shorter: 120, source: "Tumbler's Belt" }, { shorter: 30, source: "Talisman" }]), { feet: 30, damage: 15, before: 15, prone: true, by: "Tumbler's Belt", reductions: [] });
+    assert.deepEqual(easedFall(100, [{ shorter: 120, source: "Tumbler's Belt" }]), { feet: 0, damage: 0, before: 0, prone: false, by: "Tumbler's Belt", reductions: [] });
+    assert.deepEqual(easedFall(100, [{ shorter: 10 }, { noDamage: true, source: "Dragonaut's Wingsuit" }]), { feet: 0, damage: 0, before: 0, prone: false, by: "Dragonaut's Wingsuit", reductions: [] });
+    // (Damage taken off — an Impact Foam Chassis: the largest one, for a fall at least its minFeet, up to the damage; after a shorter fall.)
+    const foam = (reduceBy, source) => ({ reduceBy, minFeet: 10, itemUuid: `Item.${source}`, source });
+    assert.deepEqual(easedFall(60, [foam(20, "Lesser"), foam(50, "Moderate")]), { feet: 60, damage: 0, before: 30, prone: false, by: "Moderate", reductions: [{ source: "Moderate", itemUuid: "Item.Moderate", amount: 30 }] });
+    assert.deepEqual(easedFall(100, [foam(20, "Lesser")]), { feet: 100, damage: 30, before: 50, prone: true, by: "Lesser", reductions: [{ source: "Lesser", itemUuid: "Item.Lesser", amount: 20 }] });
+    assert.deepEqual(easedFall(5, [foam(20, "Lesser")]).reductions, [], "a fall shorter than its minFeet");
+    assert.deepEqual(easedFall(150, [{ shorter: 120, source: "Tumbler's Belt" }, foam(20, "Lesser")]), { feet: 30, damage: 0, before: 15, prone: false, by: "Tumbler's Belt, Lesser", reductions: [{ source: "Lesser", itemUuid: "Item.Lesser", amount: 15 }] });
+    assert.deepEqual(easedFall(40, [{ noDamage: true, source: "Wingsuit" }, foam(20, "Lesser")]).reductions, [], "no damage to reduce");
+    assert.deepEqual(easedFall(160, [{ shorter: 120, landsOnFeet: true, source: "Tumbler's Belt" }]), { feet: 40, damage: 20, before: 20, prone: false, by: "Tumbler's Belt", reductions: [] }, "hurt, but on its feet");
+    assert.deepEqual(easedFall(60, [{ shorter: 25, source: "Gliding Membranes" }, { landsOnFeet: true, source: "Belt" }]), { feet: 35, damage: 17, before: 17, prone: false, by: "Gliding Membranes, Belt", reductions: [] });
 });
 
 test("terrain: ice is difficult uneven ground, heavy undergrowth gives cover, lava burns each turn", () => {

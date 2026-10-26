@@ -131,6 +131,22 @@ test("healing the creature, and temporary Hit Points equal to the damage dealt (
     assert.deepEqual(validateChanges(changes), []);
 });
 
+// (Exsanguinate's own damage is "6d6[bleed]", which PF2e — and dice.js — always takes as persistent: no immediate damage to share. The
+// test deals piercing.)
+test("temporary Hit Points from a share of the damage the target takes after its resistances (Exsanguinate's shape, 2026-10-26)", () => {
+    const registry = createRegistry();
+    for (const family of CORE_FAMILIES) registry.registerFamily(family);
+    const exsanguinate = {
+        modelVersion: 13, source: { name: "Exsanguinate" }, rank: 1, traits: [],
+        resolution: { kind: "check", check: { roll: "automatic", statistic: "automatic" }, sharedDamage: null, outcomes: { criticalSuccess: none, success: { damage: { mode: "formulas", formulas: [{ formula: "6d6[piercing]" }], rollScope: "outcome" }, effects: [{ kind: "temp-hp", fromDamage: true, fraction: 0.5, afterResistances: true, recipient: "self", duration: { mode: "fixed", value: 1, unit: "minutes" } }] }, failure: none, criticalFailure: none } }
+    };
+    const context = { caster: { id: "blade" }, targets: [{ id: "victim" }], statistic: () => ({ modifier: 0, dc: 10 }) };
+    const changes = registry.resolveSync(exsanguinate, context, { roll: () => ({ degree: "success" }), damage: () => 21 }).changes;
+    assert.ok(changes.findIndex((change) => change.op === "damage") < changes.findIndex((change) => change.op === "tempHp"), "the damage first: the runtime gives a share of what it took");
+    assert.deepEqual(changes.find((change) => change.op === "tempHp"), { op: "tempHp", target: "blade", amount: 10, duration: { mode: "fixed", value: 1, unit: "minutes" }, fromDamage: { of: "victim", fraction: 0.5, afterResistances: true } });
+    assert.deepEqual(validateChanges(changes), []);
+});
+
 test("a check's own bonus: added to the roll's modifier and passed on (2026-10-10, batch 36)", () => {
     const registry = createRegistry();
     for (const family of CORE_FAMILIES) registry.registerFamily(family);

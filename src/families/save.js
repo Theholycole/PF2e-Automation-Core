@@ -369,14 +369,19 @@ export function* saveSteps(plan, context = {}) {
             else if (effect?.kind === "end-condition") changes.push({ op: "end", target: recipient, what: { conditions: effect.slugs ?? [effect.slug], from: effect.recipient === "self" ? target : null, ...(effect.stabilize ? { stabilize: true } : {}) } });
             // Temporary Hit Points ("gains 40 temporary Hit Points that last for 1 minute", "6d8 temporary Hit Points"): a fixed
             // amount, or the formula rolled; duration as a condition's, for the runtime.
-            // (fromDamage: "temporary Hit Points equal to the damage dealt", this row's damage on this target as rolled.)
+            // (fromDamage: "temporary Hit Points equal to the damage dealt", this row's damage on this target as rolled; fraction: a share of it,
+            // rounded down — Exsanguinate's half; afterResistances: of what the target takes after its resistances, which only the runtime knows
+            // as it applies the damage — the change's fromDamage { of, fraction, afterResistances }, its amount the rolled share until then.
+            // 2026-10-26, with the item module's session.)
             else if (effect?.kind === "temp-hp" || effect?.kind === "heal") {
                 const fixed = Number(effect.amount);
                 const dealt = rolled.filter(({ instance }) => instance.category !== "persistent").reduce((sum, { amount: rolledAmount }) => sum + rolledAmount, 0);
-                const amount = effect.fromDamage ? dealt : Number.isFinite(fixed) ? fixed : (yield* rollEach(parseDamage(String(effect.formula ?? "0")))).reduce((sum, { amount: rolledAmount }) => sum + rolledAmount, 0);
+                const fraction = Number(effect.fraction) > 0 ? Number(effect.fraction) : 1;
+                const amount = effect.fromDamage ? Math.floor(dealt * fraction) : Number.isFinite(fixed) ? fixed : (yield* rollEach(parseDamage(String(effect.formula ?? "0")))).reduce((sum, { amount: rolledAmount }) => sum + rolledAmount, 0);
+                const share = effect.fromDamage && (fraction !== 1 || effect.afterResistances) ? { fromDamage: { of: target, fraction, afterResistances: Boolean(effect.afterResistances) } } : {};
                 // Healing on the creature (Drink Blood's "regains 10 Hit Points, gaining any excess as temporary Hit Points").
                 if (amount > 0 && effect.kind === "heal") changes.push({ op: "heal", target: recipient, amount, ...(effect.excessAsTemp ? { excessAsTemp: true } : {}) });
-                else if (amount > 0) changes.push({ op: "tempHp", target: recipient, amount, duration: effect.duration ?? null });
+                else if (amount > 0) changes.push({ op: "tempHp", target: recipient, amount, duration: effect.duration ?? null, ...share });
             }
             // Disarm (the item falls, or the grip weakens) and Swallow Whole: passed on for the runtime to play.
             else if (PASSED_EFFECTS.has(effect?.kind)) changes.push({ op: "effect", target: recipient, effect: passedEffect(effect) });
