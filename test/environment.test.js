@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { categoryDice, soakedTemperature, temperatureFromFahrenheit } from "../src/environment/catalog.js";
-import { AQUATIC_COMBAT, CONCEALED, OFF_GUARD, creatureEffect, effectiveWeather, feltTemperature, flatCheckFor, normalizeState, rangedInWind, sceneMovementCosts } from "../src/environment/weather.js";
+import { AQUATIC_COMBAT, CONCEALED, OFF_GUARD, creatureEffect, ignoresWeather, effectiveWeather, feltTemperature, flatCheckFor, normalizeState, rangedInWind, sceneMovementCosts } from "../src/environment/weather.js";
 import { boundaries, clockDamage, fatigueHours, lightningChances, turnStartDamage } from "../src/environment/ticks.js";
 import { bandDC, disasterCard, easedFall, fallingDamage } from "../src/environment/disasters.js";
 import { PF2E_FEATURES, featureRules, goesUp, ignoresFeature, sureFooted } from "../src/environment/terrain.js";
@@ -103,6 +103,26 @@ test("temperature: °F to its category (humidity lowers the heat), gear and Envi
     assert.equal(feltTemperature(normalizeState({ temperature: "severe-cold" }), { gear: { coldWeather: true } }), "mild-cold");
     assert.equal(feltTemperature(normalizeState({ temperature: "extreme-heat" }), { gear: { coldWeather: true } }), "extreme-heat");
     assert.equal(feltTemperature(normalizeState({ temperature: "extreme-heat" }), { gear: { endurance: true } }), "mild-heat");
+});
+
+test("what a creature ignores of the weather: Ixamè's Eye through fog, a Cape of the Open Sky, Wintershot's Strikes", () => {
+    const fog = normalizeState({ fog: { level: "thick" }, precipitation: { level: "downpour", kind: "rain" }, wind: { level: "strong" } });
+    const eye = { weatherIgnores: [{ ignores: ["fog-mist"], source: "Ixamè's Eye" }] };
+    assert.equal(rule(creatureEffect(fog, eye), "FlatModifier", "environment-sight").value, -3, "the downpour still hinders it");
+    assert.equal(flatCheckFor(fog, { attacker: eye, distance: 30 }), null, "through the fog; the downpour conceals only past 60");
+    assert.equal(flatCheckFor(fog, { attacker: eye, distance: 70 }).dc, 5);
+    const cape = { weatherIgnores: [{ ignores: ["sight", "concealment", "wind-movement"], source: "Cape of the Open Sky" }] };
+    const capeEffect = creatureEffect(normalizeState({ fog: { level: "thick" }, wind: { level: "severe" } }), { ...cape, speeds: { fly: 30 }, size: "sm" });
+    assert.ok(!rule(capeEffect, "FlatModifier", "environment-sight"));
+    assert.ok(!capeEffect.summary.some((line) => /Maneuver in Flight|On the ground/.test(line)));
+    assert.equal(flatCheckFor(fog, { attacker: cape, distance: 200 }), null);
+    const wintershot = { weatherIgnores: [{ ignores: ["precipitation", "wind-ranged"], weapon: "w1", windUpTo: 2, source: "Wintershot" }] };
+    assert.deepEqual(rule(creatureEffect(fog, wintershot), "FlatModifier", "environment-wind").predicate, [{ not: "item:trait:impulse" }, { nor: ["item:id:w1"] }]);
+    assert.ok(!rule(creatureEffect(normalizeState({ wind: { level: "severe" } }), wintershot), "FlatModifier", "environment-wind").predicate.some((entry) => entry.nor), "−3 is past its −2");
+    assert.equal(flatCheckFor(normalizeState({ precipitation: { level: "downpour", kind: "rain" } }), { attacker: wintershot, distance: 70, weapon: "w1" }), null);
+    assert.equal(flatCheckFor(normalizeState({ precipitation: { level: "downpour", kind: "rain" } }), { attacker: wintershot, distance: 70, weapon: "other" }).dc, 5);
+    assert.ok(ignoresWeather(cape, "wind-movement"));
+    assert.ok(!ignoresWeather(wintershot, "wind-ranged"), "only its weapon's Strikes");
 });
 
 test("protections (the item module's): the mildest of them and the gear, no chaining, nothing harsher; fatigue's most hours added", () => {

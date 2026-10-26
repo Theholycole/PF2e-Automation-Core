@@ -98,20 +98,41 @@ export function senseSources(state, creature = {}) {
     return { sight, hearing };
 }
 
+// (2026-10-26, with the item module's session.) What of the weather a creature ignores: creature.weatherIgnores, [{ ignores: [keys],
+// source, weapon?: an item id (only that weapon's Strikes), windUpTo?: the most wind penalty it negates }]. Keys: "sight" (sight
+// penalties), "fog-mist" (fog's sight penalty and concealment), "precipitation" (rain and snow's concealment), "concealment" (every
+// concealment it would see through, as the viewer), "wind-ranged" (the wind's penalty on its ranged Strikes), "wind-movement" (the wind's
+// checks and costs on its moves, being blown). Ixamè's Eye, a Cape of the Open Sky, Wintershot.
+export function ignoresWeather(creature, key, { weapon = null, wind = null } = {}) {
+    return (creature?.weatherIgnores ?? []).some((entry) => (entry?.ignores ?? []).includes(key) && (!entry.weapon || entry.weapon === weapon) && (wind === null || !Number.isFinite(Number(entry.windUpTo)) || Math.abs(wind) <= Number(entry.windUpTo)));
+}
+
+// The sight sources that hinder this creature's own sight (its penalty), and those that conceal its targets from it (with a weapon: that
+// Strike's).
+export function penaltySight(state, creature = {}) {
+    if (ignoresWeather(creature, "sight")) return [];
+    return senseSources(state, creature).sight.filter((source) => !(source.toggle === "fog" && ignoresWeather(creature, "fog-mist")));
+}
+export function concealingSight(state, creature = {}, weapon = null) {
+    if (ignoresWeather(creature, "concealment", { weapon })) return [];
+    return senseSources(state, creature).sight.filter((source) => !(source.toggle === "fog" && ignoresWeather(creature, "fog-mist", { weapon })) && !(source.toggle === "precipitation" && ignoresWeather(creature, "precipitation", { weapon })));
+}
+
 // The nearest distance beyond which this creature's foes are concealed to it, from its weather (0: all of them; null: none).
-// (Concealment is the target's: a creature in fog is concealed to the others; the GM's "beyond" applies to every viewer alike.)
+// (Concealment is the target's: a creature in fog is concealed to the others; the GM's "beyond" applies to every viewer alike. Without a
+// creature, any viewer's.)
 export function concealedBeyond(state, creature = {}) {
-    const beyonds = senseSources(state, creature).sight.map((source) => source.beyond).filter((value) => value !== null && value !== undefined);
+    const beyonds = concealingSight(state, creature).map((source) => source.beyond).filter((value) => value !== null && value !== undefined);
     return beyonds.length ? Math.min(...beyonds) : null;
 }
 
 // Whether an attacker must roll a flat check against a target, and its DC: 11 hidden beyond the water's visibility, 5 concealed beyond the
 // weather's distance (0: always). An attacker with a precise sense other than sight that reaches the target perceives it anyway.
-export function flatCheckFor(state, { attacker = {}, target = {}, distance = 0 }) {
+export function flatCheckFor(state, { attacker = {}, target = {}, distance = 0, weapon = null }) {
     if (preciseNonVisual(attacker, distance)) return null;
     const weather = effectiveWeather(state);
     if (weather.underwater && Number.isFinite(weather.underwater.hiddenBeyond) && distance > weather.underwater.hiddenBeyond) return { dc: 11, why: `${levelOf("underwater", weather.underwater.level).label}: beyond ${weather.underwater.hiddenBeyond} feet, hidden` };
-    const sources = senseSources(state, attacker).sight.filter((source) => source.beyond !== null && source.beyond !== undefined && distance > source.beyond);
+    const sources = concealingSight(state, attacker, weapon).filter((source) => source.beyond !== null && source.beyond !== undefined && distance > source.beyond);
     if (!sources.length) return null;
     const nearest = sources.reduce((best, source) => (source.beyond < best.beyond ? source : best));
     return { dc: 5, why: nearest.beyond ? `${nearest.label}: beyond ${nearest.beyond} feet, concealed` : `${nearest.label}: concealed` };
@@ -175,7 +196,8 @@ export function creatureEffect(state, creature = {}) {
     const rules = [];
     const lines = [];
     const names = [];
-    const { sight, hearing } = senseSources(state, creature);
+    const { hearing } = senseSources(state, creature);
+    const sight = penaltySight(state, creature);
     const worst = (list) => list.reduce((best, source) => (source.penalty < best.penalty ? source : best), { penalty: 0 });
 
     const seeing = worst(sight);
@@ -210,11 +232,15 @@ export function creatureEffect(state, creature = {}) {
             rules.push({ key: "Note", selector: "ranged-strike-attack-roll", title: level.label, text: "Physical ranged attacks are impossible in a windstorm: the attack misses.", predicate: [{ not: "item:trait:impulse" }] });
             lines.push("Physical ranged attacks are impossible.");
         } else if (level.ranged) {
-            rules.push({ key: "FlatModifier", selector: "ranged-strike-attack-roll", type: "circumstance", value: level.ranged, label: level.label, slug: "environment-wind", predicate: [{ not: "item:trait:impulse" }] });
-            lines.push(`${level.ranged} to physical ranged attacks.`);
+            // (A weapon that negates it — Wintershot's up to −2, the Heroic one's any —: not on its Strikes; one for all of them: none.)
+            const weapons = (creature.weatherIgnores ?? []).filter((entry) => entry?.weapon && ignoresWeather(creature, "wind-ranged", { weapon: entry.weapon, wind: level.ranged })).map((entry) => `item:id:${entry.weapon}`);
+            if (!ignoresWeather(creature, "wind-ranged", { wind: level.ranged })) {
+                rules.push({ key: "FlatModifier", selector: "ranged-strike-attack-roll", type: "circumstance", value: level.ranged, label: level.label, slug: "environment-wind", predicate: [{ not: "item:trait:impulse" }, ...(weapons.length ? [{ nor: weapons }] : [])] });
+                lines.push(`${level.ranged} to physical ranged attacks.`);
+            }
         }
-        if (level.flightDC && creature.speeds?.fly) lines.push(`Flying: Maneuver in Flight (DC ${weather.wind.flightDC}) each round, or be blown ${weather.wind.blownFeet} feet ${weather.wind.direction}.`);
-        if (level.groundDC && (!level.groundSizes || level.groundSizes.includes(creature.size))) {
+        if (level.flightDC && creature.speeds?.fly && !ignoresWeather(creature, "wind-movement")) lines.push(`Flying: Maneuver in Flight (DC ${weather.wind.flightDC}) each round, or be blown ${weather.wind.blownFeet} feet ${weather.wind.direction}.`);
+        if (level.groundDC && (!level.groundSizes || level.groundSizes.includes(creature.size)) && !ignoresWeather(creature, "wind-movement")) {
             const sizePenalty = creature.size === "tiny" ? -2 : creature.size === "sm" ? -1 : 0;
             lines.push(`On the ground: Athletics (DC ${weather.wind.groundDC}${sizePenalty ? `, ${sizePenalty} for its size` : ""}) to move; a critical failure knocks it back and prone.`);
         }

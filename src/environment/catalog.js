@@ -103,11 +103,12 @@ export const WEATHER = {
             hail: { label: "Hail", frozen: true, sense: "hearing", conceals: false }
         },
         levels: [
-            { key: "light", label: "Drizzle or light snowfall", penalty: 0, beyond: null, note: "Little effect beyond limited visibility." },
+            // (Labels that read with the kind: "Heavy rain", "Very heavy snow"; a downpour is very heavy rain, a whiteout torrential snow.)
+            { key: "light", label: "Light", penalty: 0, beyond: null, note: "Drizzle or light snowfall: little effect beyond limited visibility." },
             { key: "moderate", label: "Steady", penalty: -1, beyond: null },
             { key: "heavy", label: "Heavy", penalty: -2, beyond: 120, soaks: true },
-            { key: "downpour", label: "Downpour or heavy snow", penalty: -3, beyond: 60, soaks: true },
-            { key: "deluge", label: "Deluge or whiteout", penalty: -4, beyond: 30, soaks: true }
+            { key: "downpour", label: "Very heavy", penalty: -3, beyond: 60, soaks: true },
+            { key: "deluge", label: "Torrential", penalty: -4, beyond: 30, soaks: true }
         ],
         text: "Wet precipitation douses flames; frozen precipitation can leave snow or ice on the ground. Hail penalizes auditory Perception instead of visual."
     },
