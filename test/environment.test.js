@@ -5,7 +5,7 @@ import { categoryDice, soakedTemperature, temperatureFromFahrenheit } from "../s
 import { AQUATIC_COMBAT, CONCEALED, OFF_GUARD, creatureEffect, effectiveWeather, feltTemperature, flatCheckFor, normalizeState, rangedInWind, sceneMovementCosts } from "../src/environment/weather.js";
 import { boundaries, clockDamage, fatigueHours, lightningChances, turnStartDamage } from "../src/environment/ticks.js";
 import { bandDC, disasterCard, fallingDamage } from "../src/environment/disasters.js";
-import { featureRules } from "../src/environment/terrain.js";
+import { featureRules, goesUp } from "../src/environment/terrain.js";
 
 const rule = (effect, key, slug) => effect.rules.find((entry) => entry.key === key && (!slug || entry.slug === slug));
 
@@ -162,4 +162,15 @@ test("terrain: ice is difficult uneven ground, heavy undergrowth gives cover, la
     assert.deepEqual(lava.events.hazard, { formula: "20d6", type: "fire", when: "turn" });
     assert.ok(featureRules("ledge").effect.rules.some((entry) => entry.key === "Note"));
     assert.equal(featureRules("bogus"), null);
+});
+
+test("stairs: difficult only going up — the region's up direction", () => {
+    const stairs = featureRules("stairs");
+    assert.deepEqual(stairs.costs, {});
+    assert.deepEqual(stairs.events.stairs, { cost: 2 });
+    assert.equal(goesUp({ i: 5, j: 5 }, { i: 4, j: 5 }, "N"), true);
+    assert.equal(goesUp({ i: 5, j: 5 }, { i: 6, j: 5 }, "N"), false);
+    assert.equal(goesUp({ i: 5, j: 5 }, { i: 5, j: 6 }, "N"), false, "across the steps");
+    assert.equal(goesUp({ i: 5, j: 5 }, { i: 4, j: 6 }, "N"), true, "a diagonal partly up");
+    assert.equal(featureRules("stairs-giant").costs.walk, 3, "enormous stairs: both ways");
 });

@@ -179,9 +179,10 @@ export const DIRECTIONS = { N: [0, -1], NE: [1, -1], E: [1, 0], SE: [1, 1], S: [
 export const levelOf = (toggle, key) => (WEATHER[toggle]?.levels ?? []).find((level) => level.key === key) ?? null;
 
 // --- Ground: the environmental features a scene or a region is made of (pg. 91–94) ----------------------------------------------
-// cost: 2 difficult, 3 greater difficult, for the movement actions listed (walk by default); uneven / narrow: Balance; cover: "standard"
-// automatically, "take" lets a creature Take Cover; hazard: damage on entering or starting a turn inside; swim: must Swim; climb: an
-// incline; band: the Proficiency DC Band of its checks; environment: PF2e's environment types it adds.
+// cost: 2 difficult, 3 greater difficult, for the movement actions listed (walk by default); upCost: that only moving up it (stairs); uneven /
+// narrow: Balance for each move on it; cover: "standard" automatically, "take" lets a creature Take Cover; hazard: damage for each move into
+// or through it ("enter") or at the start of each turn inside ("turn"); swim: must Swim; climb: an incline; band: the Proficiency DC Band of
+// its checks; environment: PF2e's environment types it adds.
 export const FEATURES = {
     ice: { label: "Ice", cost: 2, uneven: true, band: ["trained", "master"], environment: ["arctic"] },
     "snow": { label: "Snow", cost: 2, band: ["untrained", "expert"], environment: ["arctic"] },
@@ -211,7 +212,8 @@ export const FEATURES = {
     "stalagmites-sharp": { label: "Sharp stalagmites", cost: 3, hazard: { category: "minor", type: "piercing", when: "enter" }, band: ["trained", "expert"], environment: ["underground"] },
     "cave-floor": { label: "Uneven cave floor", cost: 2, uneven: true, band: ["untrained", "expert"], environment: ["underground"] },
     "floor-worn": { label: "Worn flagstones", uneven: true, band: ["untrained", "expert"], environment: ["urban"] },
-    stairs: { label: "Stairs (up)", cost: 2, band: ["untrained", "trained"], environment: ["urban"], note: "Difficult terrain going up; shoddy stairs are uneven ground too." },
+    // (Difficult only going up — "Stairs are difficult terrain for characters moving up them": the region's up direction, the GM's.)
+    stairs: { label: "Stairs", upCost: 2, band: ["untrained", "trained"], environment: ["urban"], note: "Shoddy stairs are uneven ground too." },
     "stairs-giant": { label: "Enormous stairs", cost: 3, band: ["untrained", "trained"], environment: ["urban"] },
     "street-poor": { label: "Broken cobblestones", cost: 2, uneven: true, band: ["untrained", "trained"], environment: ["urban"] },
     crowd: { label: "Crowd", cost: 2, band: ["trained", "master"], environment: ["urban"], part: true },

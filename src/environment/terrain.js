@@ -1,8 +1,9 @@
 // The ground a region (or a whole scene) is made of — GM Core's environmental features (catalog.js FEATURES) — as what the region does:
 // PF2e's movement costs and environment types, the Effect a creature holds while inside (off-guard on uneven ground or a narrow surface,
-// cover), and its events (Balance on entering, hazard damage, a current's push). Pure.
+// cover), and its events (Balance for each move on it, hazard damage for each move through it, a current's push, stairs' cost going up).
+// Pure.
 
-import { FEATURES, SIMPLE_DCS, categoryDice } from "./catalog.js";
+import { DIRECTIONS, FEATURES, SIMPLE_DCS, categoryDice } from "./catalog.js";
 import { bandDC } from "./disasters.js";
 
 export const MOVE_ACTIONS = ["walk", "climb", "burrow"];
@@ -17,9 +18,10 @@ export function featureRules(key, { dc = null } = {}) {
     const effectRules = [];
     const summary = [];
     if (feature.cost) summary.push(feature.cost === 3 ? "Greater difficult terrain." : "Difficult terrain.");
+    if (feature.upCost) summary.push(feature.upCost === 3 ? "Greater difficult terrain going up." : "Difficult terrain going up.");
     if (feature.uneven || feature.narrow) {
         effectRules.push({ key: "GrantItem", uuid: "Compendium.pf2e.conditionitems.Item.AJh5ex99aV6VTggg", flag: "terrainOffGuard", allowDuplicate: true, onDeleteActions: { granter: "cascade", grantee: "cascade" } });
-        summary.push(`${feature.narrow ? "A narrow surface" : "Uneven ground"}: Balance (Acrobatics DC ${checkDC}) to move on it; off-guard while on it.`);
+        summary.push(`${feature.narrow ? "A narrow surface" : "Uneven ground"}: Balance (Acrobatics DC ${checkDC}) for each move on it; off-guard while on it.`);
         if (feature.narrow) {
             effectRules.push({ key: "Note", selector: ["ac", "saving-throw"], title: feature.label, text: `On a narrow surface: hit by an attack or failing a save, a Reflex save (DC ${checkDC}) or fall.` });
             summary.push(`Hit by an attack or failing a save there: Reflex (DC ${checkDC}) or fall.`);
@@ -35,7 +37,7 @@ export function featureRules(key, { dc = null } = {}) {
     if (feature.swim) summary.push("Too deep to stand in: Swim to move.");
     if (feature.hazard) {
         const dice = categoryDice(feature.hazard.category);
-        summary.push(`Hazardous: ${dice} ${feature.hazard.type} damage ${feature.hazard.when === "enter" ? "on moving into it" : "at the start of each turn in it"}${feature.hazard.persistent ? `, and ${categoryDice(feature.hazard.persistent.category)} persistent ${feature.hazard.persistent.type}` : ""}.`);
+        summary.push(`Hazardous: ${dice} ${feature.hazard.type} damage ${feature.hazard.when === "enter" ? "for each move into or through it" : "at the start of each turn in it"}${feature.hazard.persistent ? `, and ${categoryDice(feature.hazard.persistent.category)} persistent ${feature.hazard.persistent.type}` : ""}.`);
     }
     if (feature.part) summary.push(`Diplomacy, Intimidation or Performance (DC ${checkDC}) can part it.`);
     if (feature.explodes) summary.push(`Explodes when exposed to flame: ${categoryDice(feature.explodes.category)} ${feature.explodes.type} damage.`);
@@ -45,7 +47,8 @@ export function featureRules(key, { dc = null } = {}) {
         ...(feature.hazard ? { hazard: { formula: categoryDice(feature.hazard.category), type: feature.hazard.type, when: feature.hazard.when, ...(feature.hazard.persistent ? { persistent: { formula: categoryDice(feature.hazard.persistent.category), type: feature.hazard.persistent.type } } : {}) } } : {}),
         ...(feature.part ? { part: { dc: checkDC } } : {}),
         ...(feature.explodes ? { explodes: { formula: categoryDice(feature.explodes.category), type: feature.explodes.type } } : {}),
-        ...(feature.current ? { current: true } : {})
+        ...(feature.current ? { current: true } : {}),
+        ...(feature.upCost ? { stairs: { cost: feature.upCost } } : {})
     };
     return { key, label: feature.label, dc: checkDC, costs, environment: feature.environment ?? [], effect: effectRules.length ? { name: `Terrain: ${feature.label}`, rules: effectRules } : null, events, summary };
 }
@@ -62,3 +65,10 @@ export const FEATURE_GROUPS = [
 ];
 
 export const simpleDC = (band) => SIMPLE_DCS[band] ?? null;
+
+// Whether a step between two grid spaces ({ i: row, j: column }) goes up a flight of stairs whose up is a direction (catalog.js DIRECTIONS):
+// any step with some of its way that way.
+export function goesUp(from, to, up) {
+    const [dx, dy] = DIRECTIONS[up] ?? [0, 0];
+    return (Number(to?.j) - Number(from?.j)) * dx + (Number(to?.i) - Number(from?.i)) * dy > 0;
+}
