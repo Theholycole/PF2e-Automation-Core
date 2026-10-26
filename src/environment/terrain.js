@@ -66,6 +66,38 @@ export const FEATURE_GROUPS = [
 
 export const simpleDC = (band) => SIMPLE_DCS[band] ?? null;
 
+// (2026-10-25, with the item module's session: items that ignore difficult terrain — a Winterstep Elixir's ice and snow, an Underbrush
+// Cloak's undergrowth — put PF2e's own entries on the creature, system.movement.terrain.difficult.ignored and .greater.ignored, each
+// { environment, feature }.) PF2e's feature for each of these features ("undergrowth" isn't PF2e's: the item module's, for plants).
+export const PF2E_FEATURES = {
+    ice: "ice", snow: "snow", "snow-deep": "snow", "snow-crust": "snow", rubble: "rubble", "rubble-deep": "rubble", "sand-shallow": "sand", "sand-deep": "sand",
+    crowd: "crowd", "crowd-packed": "crowd", sewer: "sewer", lava: "lava", "undergrowth-light": "undergrowth", "undergrowth-heavy": "undergrowth", "undergrowth-thorns": "undergrowth", roots: "undergrowth"
+};
+// Features whose own ignoring keeps a creature on its feet too (Frostwalker Pattern: no risk of falling on ice): no Balance, not off-guard.
+const SURE_FOOTED = new Set(["ice", "snow", "undergrowth"]);
+
+// How a creature ignores a feature's difficult terrain by its own entries: "greater" (it ignores the greater too), "difficult" (difficult
+// terrain is normal, greater is difficult), or "none". PF2e itself applies the entries for every environment and feature
+// ({ environment: "all", feature: "all" }) — those are left to it; these are the ones naming the feature, or all features of an
+// environment the feature is in.
+export function ignoresFeature(key, { difficult = [], greater = [] } = {}) {
+    const feature = PF2E_FEATURES[key] ?? null;
+    const environments = FEATURES[key]?.environment ?? [];
+    const covers = (entry) => {
+        if (!entry) return false;
+        const inEnvironment = entry.environment === "all" || environments.includes(entry.environment);
+        if (entry.feature === "all") return entry.environment !== "all" && inEnvironment;
+        return Boolean(feature) && entry.feature === feature && inEnvironment;
+    };
+    if (greater.some(covers)) return "greater";
+    return difficult.some(covers) ? "difficult" : "none";
+}
+
+// Whether its ignoring of this feature keeps it sure-footed there (no Balance, not off-guard): its own entry for ice, snow or undergrowth.
+export function sureFooted(key, ignored = {}) {
+    return SURE_FOOTED.has(PF2E_FEATURES[key]) && ignoresFeature(key, ignored) !== "none";
+}
+
 // Whether a step between two grid spaces ({ i: row, j: column }) goes up a flight of stairs whose up is a direction (catalog.js DIRECTIONS):
 // any step with some of its way that way.
 export function goesUp(from, to, up) {

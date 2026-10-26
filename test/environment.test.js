@@ -5,7 +5,7 @@ import { categoryDice, soakedTemperature, temperatureFromFahrenheit } from "../s
 import { AQUATIC_COMBAT, CONCEALED, OFF_GUARD, creatureEffect, effectiveWeather, feltTemperature, flatCheckFor, normalizeState, rangedInWind, sceneMovementCosts } from "../src/environment/weather.js";
 import { boundaries, clockDamage, fatigueHours, lightningChances, turnStartDamage } from "../src/environment/ticks.js";
 import { bandDC, disasterCard, fallingDamage } from "../src/environment/disasters.js";
-import { featureRules, goesUp } from "../src/environment/terrain.js";
+import { PF2E_FEATURES, featureRules, goesUp, ignoresFeature, sureFooted } from "../src/environment/terrain.js";
 
 const rule = (effect, key, slug) => effect.rules.find((entry) => entry.key === key && (!slug || entry.slug === slug));
 
@@ -178,6 +178,21 @@ test("terrain: ice is difficult uneven ground, heavy undergrowth gives cover, la
     assert.deepEqual(lava.events.hazard, { formula: "20d6", type: "fire", when: "turn" });
     assert.ok(featureRules("ledge").effect.rules.some((entry) => entry.key === "Note"));
     assert.equal(featureRules("bogus"), null);
+});
+
+test("ignoring a feature's difficult terrain: its own entries (not PF2e's all/all), greater too, sure-footed on ice, snow and undergrowth", () => {
+    const winterstep = { difficult: [{ environment: "all", feature: "ice" }, { environment: "all", feature: "snow" }], greater: [] };
+    assert.equal(ignoresFeature("ice", winterstep), "difficult");
+    assert.equal(ignoresFeature("snow-deep", winterstep), "difficult");
+    assert.equal(ignoresFeature("rubble", winterstep), "none");
+    assert.equal(ignoresFeature("ice", { difficult: [{ environment: "all", feature: "all" }] }), "none", "PF2e applies all/all itself");
+    assert.equal(ignoresFeature("ice", { difficult: [{ environment: "arctic", feature: "all" }] }), "difficult", "every feature of the arctic");
+    assert.equal(ignoresFeature("bog-deep", { difficult: [{ environment: "arctic", feature: "all" }] }), "none");
+    assert.equal(ignoresFeature("undergrowth-heavy", { difficult: [], greater: [{ environment: "all", feature: "undergrowth" }] }), "greater");
+    assert.equal(sureFooted("ice", winterstep), true);
+    assert.equal(sureFooted("snow-crust", winterstep), true);
+    assert.equal(sureFooted("cave-floor", { difficult: [{ environment: "underground", feature: "all" }] }), false, "not a sure-footed feature");
+    assert.equal(PF2E_FEATURES.roots, "undergrowth");
 });
 
 test("stairs: difficult only going up — the region's up direction", () => {
