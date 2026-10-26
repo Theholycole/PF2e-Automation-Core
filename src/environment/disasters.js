@@ -62,8 +62,9 @@ export const disasterCategories = (key) => (DISASTERS[key]?.categories ?? []).ma
 export const fallingDamage = (feet) => (Number(feet) > 5 ? Math.floor(Number(feet) / 2) : 0);
 
 // A fall after what eases it (2026-10-25, with the item module's session: a Tumbler's Belt's "120 feet shorter", a Dragonaut's Wingsuit's
-// no damage): eases [{ shorter?: feet, noDamage?: true, source }] — none at all for one that takes no damage from it, else the largest
-// shorter off (they don't add). { feet, damage, prone (it lands prone only when the fall hurts it), by }.
+// no damage): eases [{ shorter?: feet, noDamage?: true, landsOnFeet?: true, source }] — none at all for one that takes no damage from it,
+// else the largest shorter off (they don't add); it lands prone only when the fall hurts it and nothing lands it on its feet (a Tumbler's
+// Belt's, 2026-10-26). { feet, damage, prone, by }.
 export function easedFall(feet, eases = []) {
     const list = (eases ?? []).filter(Boolean);
     const soft = list.find((entry) => entry.noDamage);
@@ -71,5 +72,7 @@ export function easedFall(feet, eases = []) {
     const best = list.reduce((most, entry) => (Number(entry.shorter) > (Number(most?.shorter) || 0) ? entry : most), null);
     const left = Math.max(0, (Number(feet) || 0) - (Number(best?.shorter) || 0));
     const damage = fallingDamage(left);
-    return { feet: left, damage, prone: damage > 0, by: best ? best.source ?? null : null };
+    const feetFirst = list.find((entry) => entry.landsOnFeet);
+    const by = [best?.source, feetFirst && feetFirst !== best ? feetFirst.source : null].filter(Boolean).join(", ") || null;
+    return { feet: left, damage, prone: damage > 0 && !feetFirst, by };
 }

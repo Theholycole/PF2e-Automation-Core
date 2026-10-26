@@ -168,6 +168,8 @@ test("disasters: an avalanche buries all but a critical success; pyroclastic flo
     assert.deepEqual(easedFall(150, [{ shorter: 120, source: "Tumbler's Belt" }, { shorter: 30, source: "Talisman" }]), { feet: 30, damage: 15, prone: true, by: "Tumbler's Belt" });
     assert.deepEqual(easedFall(100, [{ shorter: 120, source: "Tumbler's Belt" }]), { feet: 0, damage: 0, prone: false, by: "Tumbler's Belt" });
     assert.deepEqual(easedFall(100, [{ shorter: 10 }, { noDamage: true, source: "Dragonaut's Wingsuit" }]), { feet: 0, damage: 0, prone: false, by: "Dragonaut's Wingsuit" });
+    assert.deepEqual(easedFall(160, [{ shorter: 120, landsOnFeet: true, source: "Tumbler's Belt" }]), { feet: 40, damage: 20, prone: false, by: "Tumbler's Belt" }, "hurt, but on its feet");
+    assert.deepEqual(easedFall(60, [{ shorter: 25, source: "Gliding Membranes" }, { landsOnFeet: true, source: "Belt" }]), { feet: 35, damage: 17, prone: false, by: "Gliding Membranes, Belt" });
 });
 
 test("terrain: ice is difficult uneven ground, heavy undergrowth gives cover, lava burns each turn", () => {
