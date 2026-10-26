@@ -69,12 +69,13 @@ export function lightningChances(state, creature = {}, { from, to, since = 0 }) 
 }
 
 // Travel fatigue: the hours of travel before a creature becomes fatigued — the temperature's, or 4 in anything heavier than drizzle or light
-// snowfall.
+// snowfall; then the most hours any of its protections adds (a Traveler's Cloak's 2; they don't stack).
 export function fatigueHours(state, creature = {}) {
     let hours = temperatureOf(feltTemperature(state, creature)).fatigueHours;
     const weather = effectiveWeather(state);
     if (weather.precipitation && weather.precipitation.level !== "light") hours = Math.min(hours, 4);
-    return hours;
+    const extra = Math.max(0, ...(creature.protections ?? []).map((protection) => Number(protection?.fatigueHours) || 0));
+    return hours + extra;
 }
 
 // Whether the weather makes a creature hold its breath (a fight's breath tracker, scripts/breath.js).

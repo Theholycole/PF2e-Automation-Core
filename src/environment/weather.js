@@ -2,7 +2,7 @@
 // Effect it holds while the weather lasts, whether a target is concealed or hidden from an attacker, and the temperature it feels.
 // Pure: a creature is plain data ({ size, traits, senses, speeds, flying, breathesWater, snowVision, gear, sheltered }, scripts/sync.js).
 
-import { DIRECTIONS, WEATHER, levelOf, protectedTemperature, soakedTemperature, temperatureOf } from "./catalog.js";
+import { DIRECTIONS, TEMPERATURES, WEATHER, levelOf, protectedTemperature, soakedTemperature, temperatureOf } from "./catalog.js";
 
 export const CONCEALED = "Compendium.pf2e.conditionitems.Item.DmAIPqOBomZ7H95W";
 export const OFF_GUARD = "Compendium.pf2e.conditionitems.Item.AJh5ex99aV6VTggg";
@@ -138,13 +138,20 @@ export function soaked(state, creature = {}) {
     return Boolean(level.soaks && WEATHER.precipitation.kinds[weather.precipitation.kind]?.wet);
 }
 
-// The temperature this creature feels: the scene's, a step colder soaked, eased by its gear or Environmental Endurance; a sheltered one
-// feels none of it.
+// The temperature this creature feels: the scene's, a step colder soaked, then the mildest of what its cold-weather gear, Environmental
+// Endurance and each of its protections make of it; a sheltered one feels none of it. Protections (creature.protections, the item module's:
+// a Cooling Elixir's, a Warming Parka's — 2026-10-25) are [{ counts: { felt key: the key it counts as }, fatigueHours?, source }]; they don't
+// chain, and one that would count it harsher is ignored.
 export function feltTemperature(state, creature = {}) {
     if (creature.sheltered) return "normal";
     let key = state.temperature ?? "normal";
     if (soaked(state, creature)) key = soakedTemperature(key);
-    return protectedTemperature(key, { gear: Boolean(creature.gear?.coldWeather) && key.endsWith("cold"), endurance: Boolean(creature.gear?.endurance) });
+    const options = [protectedTemperature(key, { gear: Boolean(creature.gear?.coldWeather) && key.endsWith("cold"), endurance: Boolean(creature.gear?.endurance) })];
+    for (const protection of creature.protections ?? []) {
+        const counts = protection?.counts?.[key];
+        if (TEMPERATURES.some((entry) => entry.key === counts)) options.push(counts);
+    }
+    return options.reduce((mildest, option) => (temperatureOf(option).step < temperatureOf(mildest).step ? option : mildest));
 }
 
 // The air it must hold its breath against: underwater without water breathing, unbreathable ash or smoke, a heavy sandstorm that forces it.

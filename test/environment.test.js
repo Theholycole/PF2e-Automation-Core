@@ -105,6 +105,22 @@ test("temperature: °F to its category (humidity lowers the heat), gear and Envi
     assert.equal(feltTemperature(normalizeState({ temperature: "extreme-heat" }), { gear: { endurance: true } }), "mild-heat");
 });
 
+test("protections (the item module's): the mildest of them and the gear, no chaining, nothing harsher; fatigue's most hours added", () => {
+    const heat = normalizeState({ temperature: "extreme-heat" });
+    const elixir = { counts: { "severe-heat": "mild-heat", "extreme-heat": "mild-heat" }, source: "Cooling Elixir" };
+    const shade = { counts: { "mild-heat": "normal", "severe-heat": "normal" }, source: "Shade Hat" };
+    assert.equal(feltTemperature(heat, { protections: [elixir] }), "mild-heat");
+    assert.equal(feltTemperature(heat, { protections: [elixir, shade] }), "mild-heat", "the hat doesn't chain onto the elixir's mild heat");
+    assert.equal(feltTemperature(normalizeState({ temperature: "severe-heat" }), { protections: [elixir, shade] }), "normal", "the mildest");
+    const parka = { counts: { "incredible-cold": "extreme-cold", "extreme-cold": "severe-cold", "severe-cold": "normal" }, source: "Warming Parka" };
+    assert.equal(feltTemperature(normalizeState({ temperature: "incredible-cold" }), { protections: [parka] }), "extreme-cold");
+    assert.equal(feltTemperature(normalizeState({ temperature: "extreme-cold" }), { gear: { coldWeather: true }, protections: [parka] }), "severe-cold");
+    assert.equal(feltTemperature(normalizeState({ temperature: "severe-cold" }), { protections: [{ counts: { "severe-cold": "incredible-cold" } }, { counts: { "severe-cold": "warm" } }] }), "severe-cold", "harsher or unknown: ignored");
+    const soakedParka = normalizeState({ temperature: "mild-cold", precipitation: { level: "heavy", kind: "rain" } });
+    assert.equal(feltTemperature(soakedParka, { protections: [parka] }), "normal", "soaked first: severe, which the parka negates");
+    assert.equal(fatigueHours(normalizeState({}), { protections: [{ counts: {}, fatigueHours: 2 }, { counts: {}, fatigueHours: 1 }] }), 10);
+});
+
 test("ticks: interval boundaries, temperature and ash on the clock, a sandstorm each turn, lightning each minute, travel fatigue", () => {
     assert.equal(boundaries(0, 0, 60, 60), 1);
     assert.equal(boundaries(0, 54, 60, 60), 1);
