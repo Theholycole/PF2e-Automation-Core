@@ -18,7 +18,7 @@
 // its own version (its markers are checked), so nothing is wrapped twice. The
 // core installs after every module's "ready" handlers have run.
 
-import { clampD20, combineD20Limits, d20Mark, damageMemoryFrom, readD20Mark, recentSource, rewriteRules, selectiveDifficulty, terrainEffects, transformCreated, isSystemContextMessage, isTurnChange } from "../src/patch-logic.js";
+import { clampD20, combineD20Limits, d20Mark, damageMemoryFrom, ignoredResistanceOf, lowerResistances, loweredWords, readD20Mark, recentSource, rewriteRules, rollIgnores, selectiveDifficulty, terrainEffects, transformCreated, isSystemContextMessage, isTurnChange } from "../src/patch-logic.js";
 import { activeGM, isLeadGM } from "./runtime-utils.js";
 import { wrapMethod } from "./wrap.js";
 
@@ -84,7 +84,24 @@ function installDamage() {
         } catch {
             // Memory is best effort; the damage itself must go through.
         }
-        const result = original(current, ...rest);
+        // (2026-10-27: resistance ignored in part, src/patch-logic.js — the creature's resistances lowered only while PF2e's applyIWR reads them,
+        // which it does before applyDamage first awaits; put back right after.)
+        let lowered = [];
+        try {
+            lowered = lowerResistances(this.attributes?.resistances, ignoredResistanceOf(current));
+            if (lowered.length) current = { ...current, breakdown: [...(current.breakdown ?? []), ...loweredWords(lowered)] };
+        } catch (error) {
+            lowered = [];
+            console.warn(`${CORE_ID} | Lowering resistances failed.`, error);
+        }
+        const was = lowered.map(({ resistance }) => resistance.value);
+        let result;
+        try {
+            for (const { resistance, value } of lowered) resistance.value = value;
+            result = original(current, ...rest);
+        } finally {
+            lowered.forEach(({ resistance }, index) => (resistance.value = was[index]));
+        }
         if (!after.length) return result;
         // The after-callbacks are awaited in order, each on its own, before the
         // caller's await resolves: callers read HP right after applyDamage.
@@ -101,6 +118,25 @@ function installDamage() {
         })();
     });
     markInstalled("damage");
+    // (2026-10-27: a Strike's damage roll stamped with the resistance its roller's items ignore in part — options.ignoreResistance on each
+    // roll, read back when PF2e applies it.)
+    Hooks.on("preCreateChatMessage", (document, data) => {
+        try {
+            const context = data?.flags?.pf2e?.context;
+            if (context?.type !== "damage-roll" || !document.actor) return;
+            const Predicate = game.pf2e?.Predicate;
+            const entries = rollIgnores(document.actor.items, { options: context.options ?? [], domains: context.domains ?? [] }, (predicate, options) => (Predicate ? new Predicate(predicate).test(options) : false), CORE_ID);
+            if (!entries.length) return;
+            const rolls = (document._source.rolls ?? []).map((roll) => {
+                const data = typeof roll === "string" ? JSON.parse(roll) : foundry.utils.deepClone(roll);
+                data.options = { ...(data.options ?? {}), ignoreResistance: entries };
+                return JSON.stringify(data);
+            });
+            document.updateSource({ rolls, [`flags.${CORE_ID}.ignoreResistance`]: entries });
+        } catch (error) {
+            console.warn(`${CORE_ID} | Stamping ignored resistance failed.`, error);
+        }
+    });
     Hooks.on("preCreateChatMessage", (document, data) => {
         try {
             if (data?.flags?.pf2e?.context?.type !== "damage-taken") return;
@@ -302,6 +338,10 @@ export const patchesApi = Object.freeze({
     damage: Object.freeze({
         // listener: { module, name?, before(actor, params) → ((result) => void) | null }
         onApply: (listener) => register(damageListeners, listener, ["before"]),
+        // (2026-10-27) Resistance ignored in part: applyDamage({ …, ignoreResistance: [{ value, types }] }), a damage roll's
+        // options.ignoreResistance, or an item flag flags["pf2e-resolution-core"].ignoreResistance stamped onto its roller's Strike damage
+        // (src/patch-logic.js rollIgnores). lowered(actor, entries) says what it would lower.
+        lowered: (actor, entries) => lowerResistances(actor?.attributes?.resistances, ignoredResistanceOf({ ignoreResistance: entries })).map(({ resistance, value }) => ({ type: resistance.type, from: resistance.value, to: value })),
         lastTypes: (actorUuid) => lastDamageTypes.get(actorUuid)?.types ?? [],
         lastSource: (actorUuid) => lastDamageSource.get(actorUuid) ?? null,
         // The source stamped on a damage-taken message (the spell module's older stamp too).

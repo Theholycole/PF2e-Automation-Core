@@ -83,6 +83,59 @@ export function recentSource(source, now) {
     return { uuid: source.uuid, actor: source.actor, type: source.type, ranged: source.ranged };
 }
 
+// ---- Resistance ignored in part (2026-10-27, for the item module's Awakened Adamantine Shot: "ignores up to 20 of the target's resistance
+// to physical damage") ----
+// PF2e ignores a resistance only wholly, and only a property rune's. An entry { value, types }: each resistance of a listed type counts as
+// that much lower (never below 0); value null or Infinity: none of it. Carried by applyDamage's own ignoreResistance, or by its damage roll's
+// options.ignoreResistance (stamped when the roll is made, rollIgnores).
+
+/** Entries as a list of { value, types }, the empty and malformed left out. */
+export function ignoreEntries(list) {
+    return [list ?? []].flat().filter((entry) => entry && typeof entry === "object")
+        .map((entry) => ({ value: entry.value == null || entry.value === Infinity ? Infinity : Number(entry.value), types: [entry.types ?? entry.type ?? []].flat().filter((type) => typeof type === "string" && type) }))
+        .filter((entry) => (entry.value === Infinity || entry.value > 0) && entry.types.length);
+}
+
+/** The entries an applyDamage call carries: its own and its damage roll's. */
+export function ignoredResistanceOf(params) {
+    return ignoreEntries([...[params?.ignoreResistance ?? []].flat(), ...[params?.damage?.options?.ignoreResistance ?? []].flat()]);
+}
+
+/** The resistances to lower: [{ resistance, value }] — each of a listed type, by the largest entry naming it. */
+export function lowerResistances(resistances, entries) {
+    const lowered = [];
+    for (const resistance of resistances ?? []) {
+        const by = Math.max(0, ...entries.filter((entry) => entry.types.includes(resistance?.type)).map((entry) => entry.value));
+        const value = Number(resistance?.value) || 0;
+        if (by > 0 && value > 0) lowered.push({ resistance, value: Math.max(0, value - by) });
+    }
+    return lowered;
+}
+
+/** The words for PF2e's damage breakdown: "Ignores 20 of its physical resistance". */
+export const loweredWords = (lowered) => lowered.map(({ resistance, value }) => `Ignores ${(Number(resistance.value) || 0) - value} of its ${resistance.type} resistance`);
+
+/**
+ * The entries a damage roll carries from the roller's items' flags (flags[core].ignoreResistance: an entry or a list, each with an optional
+ * PF2e predicate): an ammunition's only for a Strike with it loaded, a weapon's only for its own Strikes, any other item's (an Effect) for
+ * Strike damage or what its predicate names. test(predicate, options) → boolean.
+ */
+export function rollIgnores(items, { options = [], domains = [] } = {}, test = () => true, coreId = "pf2e-resolution-core") {
+    const found = [];
+    for (const item of items ?? []) {
+        const listed = [item?.flags?.[coreId]?.ignoreResistance ?? []].flat();
+        if (!listed.length) continue;
+        for (const entry of listed) {
+            if (!entry || typeof entry !== "object") continue;
+            const fits = item.type === "ammo" ? options.some((option) => option.endsWith(`ammo:id:${item.id}`))
+                : item.type === "weapon" ? options.includes(`item:id:${item.id}`)
+                : entry.predicate ? true : domains.includes("strike-damage");
+            if (fits && (!entry.predicate || test(entry.predicate, options))) found.push(entry);
+        }
+    }
+    return ignoreEntries(found);
+}
+
 // ---- Pipelines content modules plug into ----
 
 /** Applies registered rule rewriters in order; each gets the rules the last returned. */

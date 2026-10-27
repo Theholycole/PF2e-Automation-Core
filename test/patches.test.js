@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { clampD20, combineD20Limits, d20Mark, readD20Mark, selectiveDifficulty, terrainEffects, damageMemoryFrom, recentSource, rewriteRules, transformCreated, isSystemContextMessage, isTurnChange } from "../src/patch-logic.js";
+import { clampD20, combineD20Limits, d20Mark, readD20Mark, selectiveDifficulty, terrainEffects, damageMemoryFrom, recentSource, rewriteRules, transformCreated, isSystemContextMessage, isTurnChange, ignoreEntries, ignoredResistanceOf, lowerResistances, loweredWords, rollIgnores } from "../src/patch-logic.js";
 
 test("d20 limits: the tightest wins, and the clamp applies them", () => {
     assert.deepEqual(combineD20Limits([{ min: 5 }, { min: 10, max: 18 }, null, { max: 15 }]), { min: 10, max: 15 });
@@ -272,4 +272,34 @@ test("with libWrapper on, every patch goes through it, once, by a path it can re
     } finally {
         delete globalThis.libWrapper;
     }
+});
+
+test("2026-10-27: resistance ignored in part — up to N of each listed type, by the largest entry, never below 0", () => {
+    const shot = { value: 20, types: ["physical", "piercing", "bludgeoning"] };
+    assert.deepEqual(ignoreEntries([shot, { value: 0, types: ["fire"] }, { value: 5, types: [] }, null, { types: "cold" }]), [shot, { value: Infinity, types: ["cold"] }]);
+    assert.deepEqual(ignoredResistanceOf({ ignoreResistance: { value: 5, type: "fire" }, damage: { options: { ignoreResistance: [shot] } } }), [{ value: 5, types: ["fire"] }, shot]);
+    assert.deepEqual(ignoredResistanceOf({ damage: { options: {} } }), []);
+    const resistances = [{ type: "physical", value: 25 }, { type: "piercing", value: 10 }, { type: "fire", value: 10 }, { type: "bludgeoning", value: 0 }];
+    const lowered = lowerResistances(resistances, ignoreEntries([shot, { value: 10, types: ["physical"] }]));
+    assert.deepEqual(lowered.map(({ resistance, value }) => [resistance.type, value]), [["physical", 5], ["piercing", 0]]);
+    assert.deepEqual(loweredWords(lowered), ["Ignores 20 of its physical resistance", "Ignores 10 of its piercing resistance"]);
+    assert.deepEqual(lowerResistances(resistances, ignoreEntries([{ types: ["fire"] }])).map(({ value }) => value), [0]);
+});
+
+test("2026-10-27: a damage roll's ignored resistance from the roller's items — loaded ammunition, its own weapon, an Effect for Strikes", () => {
+    const flags = (entry) => ({ "pf2e-resolution-core": { ignoreResistance: entry } });
+    const items = [
+        { id: "shot", type: "ammo", flags: flags({ value: 20, types: ["physical"] }) },
+        { id: "bow", type: "weapon", flags: flags([{ value: 5, types: ["fire"] }]) },
+        { id: "fx", type: "effect", flags: flags({ value: 3, types: ["cold"] }) },
+        { id: "fx2", type: "effect", flags: flags({ value: 4, types: ["acid"], predicate: ["target:trait:construct"] }) },
+        { id: "plain", type: "equipment", flags: {} }
+    ];
+    const test = (predicate, options) => predicate.every((option) => options.includes(option));
+    const kinds = (roll) => rollIgnores(items, roll, test).map((entry) => entry.types[0]);
+    assert.deepEqual(kinds({ options: ["item:id:bow", "item:ammo:id:shot"], domains: ["strike-damage"] }), ["physical", "fire", "cold"]);
+    assert.deepEqual(kinds({ options: ["item:id:sword"], domains: ["strike-damage"] }), ["cold"]);
+    assert.deepEqual(kinds({ options: ["item:id:sword", "target:trait:construct"], domains: ["strike-damage"] }), ["cold", "acid"]);
+    // (Not a Strike's: only what a predicate names.)
+    assert.deepEqual(kinds({ options: ["target:trait:construct"], domains: ["spell-damage"] }), ["acid"]);
 });
