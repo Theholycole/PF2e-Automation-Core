@@ -3,13 +3,55 @@
 // its Hit Points, the DC to Force it Open, and the cards for climbing it, forcing it open and picking its lock (the environment module's
 // card shape: { key, title, check, damage, degrees, notes, rollOptions }; a degree's `structure` is what it does to the structure).
 
-import { FORCE_OPEN, LOCKS, STRUCTURES } from "./catalog.js";
+import { FORCE_OPEN, LOCKS, MATERIALS, PRECIOUS_STRUCTURES, STRUCTURES } from "./catalog.js";
 
 // (No rule gives an unattended object an AC: 10 for one that doesn't move, the GM's to change.)
 export const STRUCTURE_AC = 10;
 
-// "door" | "wall" | "portcullis".
+// GM Core's structures, and a window (the user, 2026-10-26: "for windows use Glass material stats"; GM Core's own example of a window
+// pane is thin glass, a choice in the material menu).
+export const STRUCTURE_KINDS = { ...STRUCTURES, window: { label: "Window", material: "glass" } };
+
+// "door" | "wall" | "portcullis" | "window".
 export const structureType = (kind) => String(kind ?? "").split("-")[0];
+
+const GRADES = { low: "low-grade", standard: "standard-grade", high: "high-grade" };
+// A material's numbers: a GM Core material ("glass", "stone-structure") or a precious one at a grade ("adamantine-high").
+// { label, hardness, hp, bt } or null.
+export function materialStats(key) {
+    if (MATERIALS[key]) return { ...MATERIALS[key] };
+    for (const [material, entry] of Object.entries(PRECIOUS_STRUCTURES)) {
+        for (const [grade, [hardness, hp, bt]] of Object.entries(entry.grades)) {
+            if (key === `${material}-${grade}`) return { label: `${entry.label}, ${GRADES[grade]}`, hardness, hp, bt, precious: true };
+        }
+    }
+    return null;
+}
+
+// Every material for a menu: [{ group, key, label, hardness, hp, bt }], GM Core's first, then the precious ones by grade.
+export function materialChoices() {
+    return [
+        ...Object.entries(MATERIALS).map(([key, entry]) => ({ group: "Materials (GM Core)", key, ...entry })),
+        ...Object.entries(PRECIOUS_STRUCTURES).flatMap(([material, entry]) => Object.keys(entry.grades).map((grade) => ({ group: "Precious materials (structures)", key: `${material}-${grade}`, ...materialStats(`${material}-${grade}`), source: entry.source })))
+    ];
+}
+
+// A structure's numbers: its kind's (GM Core's table), or its material's when the GM picks one (an adamantine door). { label, hardness,
+// hp, bt, climb, lift, type, material }.
+export function structureStats({ kind, material = null } = {}) {
+    const entry = STRUCTURE_KINDS[kind] ?? null;
+    const made = materialStats(material ?? entry?.material ?? null);
+    const numbers = made ?? entry ?? { hardness: 0, hp: 1, bt: 0 };
+    const label = entry ? (material && made ? `${entry.label} (${made.label.toLowerCase()})` : entry.label) : made?.label ?? "Structure";
+    return { label, hardness: numbers.hardness, hp: numbers.hp, bt: numbers.bt, climb: entry?.climb ?? null, lift: entry?.force ?? null, type: structureType(kind), material: material ?? entry?.material ?? null };
+}
+
+// The kind a Foundry wall most likely is: a door, a window (sight or light through it only up close: Foundry's window walls), or a wall.
+export function defaultKind({ door = 0, sight = 20, light = 20 } = {}) {
+    if (Number(door) > 0) return "door-wood";
+    if ([30, 40].includes(Number(sight)) || [30, 40].includes(Number(light))) return "window";
+    return "wall-masonry";
+}
 
 // Its condition from its Hit Points: destroyed at 0, broken at or below its Broken Threshold, else intact.
 export function structureCondition(hp, bt) {

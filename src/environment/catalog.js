@@ -283,6 +283,51 @@ export const STRUCTURES = {
     "portcullis-wood": { label: "Wooden portcullis", climb: 10, hardness: 10, hp: 40, bt: 20, force: 20 },
     "portcullis-iron": { label: "Iron portcullis", climb: 10, hardness: 18, hp: 72, bt: 36, force: 30 }
 };
+// Materials (GM Core's Material Statistics, Table 11-4): Hardness, Hit Points and Broken Threshold, for thin items, items and structures
+// (0 Broken Threshold where it has none). A window pane is thin glass; a glass block wall is a glass structure.
+export const MATERIALS = {
+    paper: { label: "Paper", hardness: 0, hp: 1, bt: 0 },
+    "thin-cloth": { label: "Thin cloth", hardness: 0, hp: 1, bt: 0 },
+    "thin-glass": { label: "Thin glass (window pane)", hardness: 0, hp: 1, bt: 0 },
+    cloth: { label: "Cloth", hardness: 1, hp: 4, bt: 2 },
+    glass: { label: "Glass", hardness: 1, hp: 4, bt: 2 },
+    "glass-structure": { label: "Glass structure", hardness: 2, hp: 8, bt: 4 },
+    "thin-leather": { label: "Thin leather", hardness: 2, hp: 8, bt: 4 },
+    "thin-rope": { label: "Thin rope", hardness: 2, hp: 8, bt: 4 },
+    "thin-wood": { label: "Thin wood", hardness: 3, hp: 12, bt: 6 },
+    leather: { label: "Leather", hardness: 4, hp: 16, bt: 8 },
+    rope: { label: "Rope", hardness: 4, hp: 16, bt: 8 },
+    "thin-stone": { label: "Thin stone", hardness: 5, hp: 16, bt: 8 },
+    "thin-iron": { label: "Thin iron or steel", hardness: 5, hp: 20, bt: 10 },
+    wood: { label: "Wood", hardness: 5, hp: 20, bt: 10 },
+    stone: { label: "Stone", hardness: 7, hp: 28, bt: 14 },
+    iron: { label: "Iron or steel", hardness: 9, hp: 36, bt: 18 },
+    "wood-structure": { label: "Wooden structure", hardness: 10, hp: 40, bt: 20 },
+    "stone-structure": { label: "Stone structure", hardness: 14, hp: 56, bt: 28 },
+    "iron-structure": { label: "Iron or steel structure", hardness: 18, hp: 72, bt: 36 }
+};
+// Precious materials as structures, by grade: [Hardness, HP, BT] (GM Core pg. 253–254; Grand Bazaar; Tian Xia Character Guide; Highhelm;
+// Legends; Pathfinder #162 and #183; The Dead God's Hand). Dragonhide, dreamweb and sloughstone give no structure numbers.
+export const PRECIOUS_STRUCTURES = {
+    abysium: { label: "Abysium", source: "Grand Bazaar", grades: { standard: [20, 80, 40], high: [26, 104, 52] } },
+    adamantine: { label: "Adamantine", source: "GM Core", grades: { standard: [28, 112, 56], high: [34, 136, 68] } },
+    "cold-iron": { label: "Cold iron", source: "GM Core", grades: { low: [18, 72, 36], standard: [22, 88, 44], high: [28, 112, 56] } },
+    dawnsilver: { label: "Dawnsilver (mithral)", source: "GM Core", grades: { standard: [18, 72, 36], high: [24, 96, 48] } },
+    djezet: { label: "Djezet", source: "Grand Bazaar", grades: { standard: [18, 72, 36], high: [24, 96, 48] } },
+    duskwood: { label: "Duskwood (darkwood)", source: "GM Core", grades: { standard: [14, 56, 28], high: [20, 80, 40] } },
+    inubrix: { label: "Inubrix", source: "Grand Bazaar", grades: { standard: [17, 68, 34], high: [23, 92, 46] } },
+    "keep-stone": { label: "Keep stone", source: "Highhelm", grades: { high: [30, 122, 61] } },
+    noqual: { label: "Noqual", source: "Grand Bazaar", grades: { standard: [20, 80, 40], high: [26, 104, 52] } },
+    orichalcum: { label: "Orichalcum", source: "GM Core", grades: { high: [35, 140, 70] } },
+    peachwood: { label: "Peachwood", source: "Tian Xia Character Guide", grades: { standard: [12, 48, 24], high: [18, 64, 32] } },
+    siccatite: { label: "Siccatite", source: "Grand Bazaar", grades: { standard: [20, 80, 40], high: [26, 104, 52] } },
+    silver: { label: "Silver", source: "GM Core", grades: { low: [10, 40, 20], standard: [14, 56, 28], high: [20, 80, 40] } },
+    sisterstone: { label: "Sisterstone", source: "Pathfinder #183", grades: { low: [20, 56, 28], standard: [24, 80, 40], high: [30, 108, 54] } },
+    "sovereign-steel": { label: "Sovereign steel", source: "Legends", grades: { standard: [22, 88, 44], high: [28, 112, 56] } },
+    throneglass: { label: "Throneglass", source: "The Dead God's Hand", grades: { low: [18, 72, 36], standard: [22, 88, 44], high: [28, 112, 56] } },
+    warpglass: { label: "Warpglass", source: "Pathfinder #162", grades: { high: [24, 96, 48] } }
+};
+
 // Locks (Player Core's locks): Pick a Lock's Thievery DC and the successes it takes to open.
 export const LOCKS = { poor: { label: "Poor lock", dc: 15, successes: 2 }, simple: { label: "Simple lock", dc: 20, successes: 3 }, average: { label: "Average lock", dc: 25, successes: 4 }, good: { label: "Good lock", dc: 30, successes: 5 }, superior: { label: "Superior lock", dc: 40, successes: 6 } };
 export const FORCE_OPEN = { stuck: { label: "Stuck door or window", dc: 15 }, "very-stuck": { label: "Exceptionally stuck", dc: 20 }, "portcullis-wood": { label: "Lift wooden portcullis", dc: 20 }, "portcullis-iron": { label: "Lift iron portcullis", dc: 30 }, bars: { label: "Bend metal bars", dc: 30 } };

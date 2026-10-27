@@ -266,3 +266,19 @@ test("structures: condition from Hit Points, Force Open DCs, and the climb, forc
     assert.deepEqual(structureOutcome({ lock: "good", successes: 0 }, { opens: true, breaks: true }), { next: { unlocked: true }, opens: true, breaks: true, unlocks: true });
     assert.deepEqual(structureOutcome({ lock: null }, { jams: true }).next, { jammed: true });
 });
+
+test("structure materials: GM Core's table, precious materials by grade, a window of glass, a material over a kind (2026-10-26)", async () => {
+    const { defaultKind, materialChoices, materialStats, structureStats, forceOpenDC } = await import("../src/environment/structures.js");
+    assert.deepEqual(materialStats("glass"), { label: "Glass", hardness: 1, hp: 4, bt: 2 });
+    assert.deepEqual(materialStats("adamantine-high"), { label: "Adamantine, high-grade", hardness: 34, hp: 136, bt: 68, precious: true });
+    assert.deepEqual(materialStats("cold-iron-low"), { label: "Cold iron, low-grade", hardness: 18, hp: 72, bt: 36, precious: true });
+    assert.equal(materialStats("orichalcum-standard"), null, "orichalcum is high-grade only");
+    assert.equal(materialChoices().filter((choice) => choice.group.startsWith("Precious")).length, 35);
+    assert.deepEqual(structureStats({ kind: "window" }), { label: "Window", hardness: 1, hp: 4, bt: 2, climb: null, lift: null, type: "window", material: "glass" });
+    assert.deepEqual(structureStats({ kind: "door-iron", material: "adamantine-standard" }), { label: "Iron door (adamantine, standard-grade)", hardness: 28, hp: 112, bt: 56, climb: 30, lift: null, type: "door", material: "adamantine-standard" });
+    assert.equal(structureStats({ kind: "portcullis-iron" }).lift, 30);
+    assert.equal(forceOpenDC("window"), 15, "a stuck window");
+    assert.equal(defaultKind({ door: 1 }), "door-wood");
+    assert.equal(defaultKind({ sight: 30 }), "window");
+    assert.equal(defaultKind({ sight: 20 }), "wall-masonry");
+});
