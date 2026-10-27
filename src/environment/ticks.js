@@ -3,7 +3,7 @@
 // clock, 2026-10-25), the chance of lightning each minute, and fatigue on a journey. Pure.
 
 import { BURIAL, WEATHER, levelOf, temperatureOf } from "./catalog.js";
-import { breathlessIn, effectiveWeather, feltTemperature } from "./weather.js";
+import { breathlessIn, effectiveWeather, feltTemperature, protectionHolds } from "./weather.js";
 
 // The hits of an interval that fall within (from, to], counted from the moment it started.
 export function boundaries(since, from, to, every) {
@@ -74,7 +74,7 @@ export function fatigueHours(state, creature = {}) {
     let hours = temperatureOf(feltTemperature(state, creature)).fatigueHours;
     const weather = effectiveWeather(state);
     if (weather.precipitation && weather.precipitation.level !== "light") hours = Math.min(hours, 4);
-    const extra = Math.max(0, ...(creature.protections ?? []).map((protection) => Number(protection?.fatigueHours) || 0));
+    const extra = Math.max(0, ...(creature.protections ?? []).filter((protection) => protectionHolds(state, creature, protection)).map((protection) => Number(protection?.fatigueHours) || 0));
     return hours + extra;
 }
 

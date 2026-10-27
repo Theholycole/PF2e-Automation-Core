@@ -162,13 +162,16 @@ export function soaked(state, creature = {}) {
 // The temperature this creature feels: the scene's, a step colder soaked, then the mildest of what its cold-weather gear, Environmental
 // Endurance and each of its protections make of it; a sheltered one feels none of it. Protections (creature.protections, the item module's:
 // a Cooling Elixir's, a Warming Parka's — 2026-10-25) are [{ counts: { felt key: the key it counts as }, fatigueHours?, source }]; they don't
-// chain, and one that would count it harsher is ignored.
+// chain, and one that would count it harsher is ignored. (2026-10-27, the item module's Faydhaan's Dallah's Brew: where "underwater" — one
+// that holds only underwater, the scene's weather or creature.underwater.)
+export const protectionHolds = (state, creature, protection) => protection?.where !== "underwater" || Boolean(creature?.underwater ?? effectiveWeather(state).underwater);
+
 export function feltTemperature(state, creature = {}) {
     if (creature.sheltered) return "normal";
     let key = state.temperature ?? "normal";
     if (soaked(state, creature)) key = soakedTemperature(key);
     const options = [protectedTemperature(key, { gear: Boolean(creature.gear?.coldWeather) && key.endsWith("cold"), endurance: Boolean(creature.gear?.endurance) })];
-    for (const protection of creature.protections ?? []) {
+    for (const protection of (creature.protections ?? []).filter((entry) => protectionHolds(state, creature, entry))) {
         const counts = protection?.counts?.[key];
         if (TEMPERATURES.some((entry) => entry.key === counts)) options.push(counts);
     }

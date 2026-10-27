@@ -139,6 +139,13 @@ test("protections (the item module's): the mildest of them and the gear, no chai
     const soakedParka = normalizeState({ temperature: "mild-cold", precipitation: { level: "heavy", kind: "rain" } });
     assert.equal(feltTemperature(soakedParka, { protections: [parka] }), "normal", "soaked first: severe, which the parka negates");
     assert.equal(fatigueHours(normalizeState({}), { protections: [{ counts: {}, fatigueHours: 2 }, { counts: {}, fatigueHours: 1 }] }), 10);
+    // (2026-10-27: one that holds only underwater — Faydhaan's Dallah's Brew.)
+    const brew = { counts: { "severe-cold": "normal" }, where: "underwater", fatigueHours: 2, source: "Brew" };
+    assert.equal(feltTemperature(normalizeState({ temperature: "severe-cold" }), { protections: [brew] }), "severe-cold");
+    assert.equal(feltTemperature(normalizeState({ temperature: "severe-cold", underwater: { level: "clear" } }), { protections: [brew] }), "normal");
+    assert.equal(feltTemperature(normalizeState({ temperature: "severe-cold" }), { underwater: true, protections: [brew] }), "normal", "a creature in water on a dry scene");
+    assert.equal(fatigueHours(normalizeState({}), { protections: [brew] }), 8);
+    assert.equal(fatigueHours(normalizeState({ underwater: { level: "clear" } }), { protections: [brew] }), 10);
 });
 
 test("ticks: interval boundaries, temperature and ash on the clock, a sandstorm each turn, lightning each minute, travel fatigue", () => {
@@ -197,6 +204,11 @@ test("disasters: an avalanche buries all but a critical success; pyroclastic flo
     assert.deepEqual(easedFall(40, [{ noDamage: true, source: "Wingsuit" }, foam(20, "Lesser")]).reductions, [], "no damage to reduce");
     assert.deepEqual(easedFall(160, [{ shorter: 120, landsOnFeet: true, source: "Tumbler's Belt" }]), { feet: 40, damage: 20, before: 20, prone: false, by: "Tumbler's Belt", reductions: [] }, "hurt, but on its feet");
     assert.deepEqual(easedFall(60, [{ shorter: 25, source: "Gliding Membranes" }, { landsOnFeet: true, source: "Belt" }]), { feet: 35, damage: 17, before: 17, prone: false, by: "Gliding Membranes, Belt", reductions: [] });
+    // (2026-10-27: halved after the rest — a Parachute Mail deployed low.)
+    assert.deepEqual(easedFall(90, [{ halved: true, source: "Parachute Mail" }]), { feet: 90, damage: 22, before: 45, prone: true, by: "Parachute Mail", reductions: [], halved: "Parachute Mail" });
+    assert.deepEqual(easedFall(90, [{ halved: true, source: "Parachute Mail" }, foam(20, "Lesser")]), { feet: 90, damage: 12, before: 45, prone: true, by: "Lesser, Parachute Mail", reductions: [{ source: "Lesser", itemUuid: "Item.Lesser", amount: 20 }], halved: "Parachute Mail" });
+    assert.deepEqual(easedFall(60, [{ halved: true, source: "Parachute Mail" }, foam(50, "Moderate")]), { feet: 60, damage: 0, before: 30, prone: false, by: "Moderate", reductions: [{ source: "Moderate", itemUuid: "Item.Moderate", amount: 30 }] }, "nothing left to halve");
+    assert.equal(easedFall(3, [{ halved: true, source: "Parachute Mail" }]).damage, 0);
 });
 
 test("terrain: ice is difficult uneven ground, heavy undergrowth gives cover, lava burns each turn", () => {
