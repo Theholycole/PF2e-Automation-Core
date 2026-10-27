@@ -117,18 +117,26 @@ export const loweredWords = (lowered) => lowered.map(({ resistance, value }) => 
 
 /**
  * The entries a damage roll carries from the roller's items' flags (flags[core].ignoreResistance: an entry or a list, each with an optional
- * PF2e predicate): an ammunition's only for a Strike with it loaded, a weapon's only for its own Strikes, any other item's (an Effect) for
- * Strike damage or what its predicate names. test(predicate, options) → boolean.
+ * PF2e predicate): an ammunition's only for a Strike with it loaded, a weapon's only for its own Strikes (or as the ammunition loaded),
+ * any other item's (an Effect) for Strike damage or what its predicate names. A weapon's loaded rounds are its subitems (PF2e 8.6: a
+ * firearm's, a crossbow's or a sling's, the last of a stack moved there), read with the rest. test(predicate, options) → boolean.
  */
 export function rollIgnores(items, { options = [], domains = [] } = {}, test = () => true, coreId = "pf2e-resolution-core") {
     const found = [];
-    for (const item of items ?? []) {
+    const loaded = (item) => (item?.type === "weapon" ? [...(item.subitems ?? [])].filter((sub) => sub?.type === "ammo" || sub?.type === "weapon") : []);
+    const seen = new Set();
+    for (const item of [...(items ?? [])].flatMap((item) => [item, ...loaded(item)])) {
+        // (A stack's rest and its loaded round share an id: once.)
+        const key = `${item?.type}:${item?.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         const listed = [item?.flags?.[coreId]?.ignoreResistance ?? []].flat();
         if (!listed.length) continue;
         for (const entry of listed) {
             if (!entry || typeof entry !== "object") continue;
-            const fits = item.type === "ammo" ? options.some((option) => option.endsWith(`ammo:id:${item.id}`))
-                : item.type === "weapon" ? options.includes(`item:id:${item.id}`)
+            const asAmmo = options.some((option) => option.endsWith(`ammo:id:${item.id}`));
+            const fits = item.type === "ammo" ? asAmmo
+                : item.type === "weapon" ? asAmmo || options.includes(`item:id:${item.id}`)
                 : entry.predicate ? true : domains.includes("strike-damage");
             if (fits && (!entry.predicate || test(entry.predicate, options))) found.push(entry);
         }

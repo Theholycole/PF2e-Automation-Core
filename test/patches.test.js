@@ -303,3 +303,20 @@ test("2026-10-27: a damage roll's ignored resistance from the roller's items —
     // (Not a Strike's: only what a predicate names.)
     assert.deepEqual(kinds({ options: ["target:trait:construct"], domains: ["spell-damage"] }), ["acid"]);
 });
+
+test("2026-10-27: a round loaded into a firearm, crossbow or sling (its weapon's subitem) counts, once, and only for its own weapon's Strike", () => {
+    const flags = (entry) => ({ "pf2e-resolution-core": { ignoreResistance: entry } });
+    const shot = { id: "shot", type: "ammo", flags: flags({ value: 20, types: ["physical"] }) };
+    const pistol = { id: "pistol", type: "weapon", flags: {}, subitems: [shot, { id: "kit", type: "equipment", flags: flags({ value: 9, types: ["fire"] }) }] };
+    const other = { id: "musket", type: "weapon", flags: {}, subitems: [{ id: "slug", type: "weapon", flags: flags({ value: 5, types: ["cold"] }) }] };
+    const kinds = (items, options) => rollIgnores(items, { options, domains: ["strike-damage"] }).map((entry) => `${entry.types[0]} ${entry.value}`);
+    // (The last of the stack: only the pistol's subitem; a subitem other than a round isn't read.)
+    assert.deepEqual(kinds([pistol, other], ["item:id:pistol", "item:ammo:id:shot"]), ["physical 20"]);
+    // (The rest of the stack beside it: the same round, once.)
+    assert.deepEqual(kinds([shot, pistol], ["item:id:pistol", "item:ammo:id:shot"]), ["physical 20"]);
+    // (Another weapon's Strike, and a weapon loaded as the ammunition.)
+    assert.deepEqual(kinds([pistol, other], ["item:id:musket"]), []);
+    assert.deepEqual(kinds([pistol, other], ["item:id:musket", "item:ammo:id:slug"]), ["cold 5"]);
+    // (A Collection, as PF2e's subitems are, reads the same.)
+    assert.deepEqual(kinds([{ ...pistol, subitems: new Map([["shot", shot]]).values() }], ["item:ammo:id:shot"]), ["physical 20"]);
+});
