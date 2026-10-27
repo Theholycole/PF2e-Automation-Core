@@ -239,3 +239,30 @@ test("stairs: difficult only going up — the region's up direction", () => {
     assert.equal(goesUp({ i: 5, j: 5 }, { i: 4, j: 6 }, "N"), true, "a diagonal partly up");
     assert.equal(featureRules("stairs-giant").costs.walk, 3, "enormous stairs: both ways");
 });
+
+test("structures: condition from Hit Points, Force Open DCs, and the climb, force and lock cards (2026-10-26)", async () => {
+    const { STRUCTURE_AC, climbCard, forceOpenCard, forceOpenDC, pickLockCard, structureCondition, structureOutcome, structureType } = await import("../src/environment/structures.js");
+    assert.equal(STRUCTURE_AC, 10);
+    assert.equal(structureType("portcullis-iron"), "portcullis");
+    assert.equal(structureCondition(40, 20), "intact");
+    assert.equal(structureCondition(20, 20), "broken", "at its Broken Threshold");
+    assert.equal(structureCondition(0, 20), "destroyed");
+    assert.equal(forceOpenDC("door-wood"), 15, "a stuck door");
+    assert.equal(forceOpenDC("door-wood", { stuck: "very-stuck" }), 20);
+    assert.equal(forceOpenDC("door-wood", { lock: "average" }), 30, "the lock's Thievery DC + 5");
+    assert.equal(forceOpenDC("portcullis-iron"), 30);
+    assert.equal(forceOpenDC("portcullis-wood", { lock: "simple" }), 25, "the higher of the lift and the lock");
+    assert.equal(forceOpenDC("portcullis-iron", { lock: "poor" }), 30);
+    assert.deepEqual(climbCard({ label: "Masonry wall", dc: 20 }).degrees.criticalFailure, { conditions: [{ slug: "prone" }] });
+    assert.deepEqual(climbCard({ label: "Masonry wall", dc: 20, height: 15 }).degrees.criticalFailure, { falls: { feet: 15 } });
+    const force = forceOpenCard({ label: "Wooden door", dc: 30, jammed: true, structure: "Scene.s.Token.t" });
+    assert.deepEqual(force.check, { statistic: "athletics", dc: 30, basic: false, penalty: { value: -2, label: "Jammed" } });
+    assert.deepEqual(force.degrees.success, { structure: { opens: true, breaks: true } });
+    assert.equal(pickLockCard({ label: "Iron door", lock: "none" }), null);
+    assert.equal(pickLockCard({ label: "Iron door", lock: "good" }).check.dc, 30);
+    const lock = { lock: "poor", successes: 1, unlocked: false };
+    assert.deepEqual(structureOutcome(lock, { lockSuccesses: 1 }), { next: { successes: 2, unlocked: true }, opens: false, breaks: false, unlocks: true });
+    assert.deepEqual(structureOutcome({ lock: "good", successes: 0 }, { lockSuccesses: 2 }).next, { successes: 2 });
+    assert.deepEqual(structureOutcome({ lock: "good", successes: 0 }, { opens: true, breaks: true }), { next: { unlocked: true }, opens: true, breaks: true, unlocks: true });
+    assert.deepEqual(structureOutcome({ lock: null }, { jams: true }).next, { jammed: true });
+});

@@ -283,6 +283,8 @@ export const STRUCTURES = {
     "portcullis-wood": { label: "Wooden portcullis", climb: 10, hardness: 10, hp: 40, bt: 20, force: 20 },
     "portcullis-iron": { label: "Iron portcullis", climb: 10, hardness: 18, hp: 72, bt: 36, force: 30 }
 };
+// Locks (Player Core's locks): Pick a Lock's Thievery DC and the successes it takes to open.
+export const LOCKS = { poor: { label: "Poor lock", dc: 15, successes: 2 }, simple: { label: "Simple lock", dc: 20, successes: 3 }, average: { label: "Average lock", dc: 25, successes: 4 }, good: { label: "Good lock", dc: 30, successes: 5 }, superior: { label: "Superior lock", dc: 40, successes: 6 } };
 export const FORCE_OPEN = { stuck: { label: "Stuck door or window", dc: 15 }, "very-stuck": { label: "Exceptionally stuck", dc: 20 }, "portcullis-wood": { label: "Lift wooden portcullis", dc: 20 }, "portcullis-iron": { label: "Lift iron portcullis", dc: 30 }, bars: { label: "Bend metal bars", dc: 30 } };
 
 // Holding your breath (Player Core 437): 5 + Con rounds of air; 1 a turn (2 after attacking or casting), 1 more for a critical hit taken or a
