@@ -294,3 +294,34 @@ test("structure materials: GM Core's table, precious materials by grade, a windo
     assert.equal(defaultKind({ sight: 30 }), "window");
     assert.equal(defaultKind({ sight: 20 }), "wall-masonry");
 });
+
+test("2026-10-27: a structure's own numbers and lock (an Instant Fortress), its walls from a template, and the creatures pushed out", async () => {
+    const { forceOpenDC, lockStats, pickLockCard, pushedOut, structureLayout, structureOutcome, structureStats } = await import("../src/environment/structures.js");
+    assert.deepEqual(structureStats({ kind: "wall-iron", material: "adamantine-high", stats: { hardness: 20, hp: 80, bt: 40 } }).hardness, 20);
+    assert.deepEqual([structureStats({ kind: "door-iron", stats: { hp: 90 } }).hp, structureStats({ kind: "door-iron", stats: { hp: 90 } }).bt], [90, 45], "a BT of half its own HP when it gives none");
+    assert.deepEqual(structureStats({ kind: "door-iron", stats: { hp: "" } }), structureStats({ kind: "door-iron" }));
+    assert.deepEqual(lockStats("superior"), { label: "Superior lock", dc: 40, successes: 6 });
+    assert.deepEqual(lockStats("custom", { dc: 35, successes: 4 }), { label: "Lock", dc: 35, successes: 4 });
+    assert.deepEqual(lockStats("good", { dc: 33 }), { label: "Good lock", dc: 33, successes: 5 });
+    assert.equal(lockStats("custom"), null);
+    assert.equal(forceOpenDC("door-iron", { lock: "custom", lockDC: 35 }), 40);
+    assert.equal(forceOpenDC("door-iron", { lock: "good", dc: 40 }), 40, "its own Force Open DC");
+    assert.equal(pickLockCard({ label: "Fortress door", lock: "custom", lockDC: 38, lockSuccesses: 3 }).check.dc, 38);
+    assert.deepEqual(structureOutcome({ lock: "custom", lockDC: 38, lockSuccesses: 3, successes: 2 }, { lockSuccesses: 1 }).next, { successes: 3, unlocked: true });
+    const grid = { size: 100, distance: 5 };
+    // (A 20-foot square about the middle of the square at 400,400, its 5-foot door in the middle of its south side.)
+    const fort = structureLayout({ at: { x: 450, y: 450 }, shape: "square", feet: 20, door: { side: "south" } }, grid);
+    assert.deepEqual(fort.inside, { x: 300, y: 300, width: 400, height: 400 });
+    assert.deepEqual(fort.walls.map((wall) => [wall.side, wall.door, ...wall.c]), [
+        ["north", false, 300, 300, 700, 300], ["east", false, 700, 300, 700, 700],
+        ["south", false, 300, 700, 400, 700], ["south", true, 400, 700, 500, 700], ["south", false, 500, 700, 700, 700],
+        ["west", false, 300, 300, 300, 700]
+    ]);
+    // (A line on the grid line nearest its middle.)
+    assert.deepEqual(structureLayout({ at: { x: 450, y: 450 }, shape: "line", feet: 10 }, grid), { walls: [{ c: [400, 500, 600, 500], side: "line", door: false }], inside: null });
+    assert.deepEqual(structureLayout({ at: { x: 450, y: 450 }, shape: "line", feet: 10, rotation: 90 }, grid).walls[0].c, [500, 400, 500, 600]);
+    assert.deepEqual(structureLayout({ at: { x: 400, y: 400 }, shape: "line", feet: 15, door: {} }, grid).walls.map((wall) => [wall.door, ...wall.c]), [[false, 300, 400, 400, 400], [true, 400, 400, 500, 400], [false, 500, 400, 600, 400]]);
+    const tokens = [{ id: "in", x: 400, y: 600, width: 1, height: 1 }, { id: "big", x: 300, y: 300, width: 2, height: 2 }, { id: "out", x: 800, y: 300, width: 1, height: 1 }];
+    assert.deepEqual(pushedOut(tokens, fort.inside, grid), [{ id: "in", x: 400, y: 700 }, { id: "big", x: 300, y: 100 }]);
+    assert.deepEqual(pushedOut(tokens, null, grid), []);
+});
