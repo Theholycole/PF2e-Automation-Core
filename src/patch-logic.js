@@ -101,11 +101,11 @@ export function ignoredResistanceOf(params) {
     return ignoreEntries([...[params?.ignoreResistance ?? []].flat(), ...[params?.damage?.options?.ignoreResistance ?? []].flat()]);
 }
 
-/** The resistances to lower: [{ resistance, value }] — each of a listed type, by the largest entry naming it. */
+/** The resistances to lower: [{ resistance, value }] — each of a listed type (or every one, types ["*"]: Penetrating Ammunition), by the largest entry naming it. */
 export function lowerResistances(resistances, entries) {
     const lowered = [];
     for (const resistance of resistances ?? []) {
-        const by = Math.max(0, ...entries.filter((entry) => entry.types.includes(resistance?.type)).map((entry) => entry.value));
+        const by = Math.max(0, ...entries.filter((entry) => entry.types.includes(resistance?.type) || entry.types.includes("*")).map((entry) => entry.value));
         const value = Number(resistance?.value) || 0;
         if (by > 0 && value > 0) lowered.push({ resistance, value: Math.max(0, value - by) });
     }
@@ -114,6 +114,25 @@ export function lowerResistances(resistances, entries) {
 
 /** The words for PF2e's damage breakdown: "Ignores 20 of its physical resistance". */
 export const loweredWords = (lowered) => lowered.map(({ resistance, value }) => `Ignores ${(Number(resistance.value) || 0) - value} of its ${resistance.type} resistance`);
+
+// (2026-10-27, the item module's Soulspark Candle: "ignore fire resistance or immunity".) An immunity ignored: applyDamage({ …, ignoreImmunity:
+// ["fire"] }) or its damage roll's options.ignoreImmunity — the creature's immunities of a listed type left out while PF2e reads them.
+
+/** The immunity types an applyDamage call ignores: its own and its damage roll's. */
+export function ignoredImmunitiesOf(params) {
+    return [...new Set([...[params?.ignoreImmunity ?? []].flat(), ...[params?.damage?.options?.ignoreImmunity ?? []].flat()].filter((type) => typeof type === "string" && type && type !== "*"))];
+}
+
+/** The immunities kept and those left out: { kept, ignored }. */
+export function keptImmunities(immunities, types) {
+    const kept = [];
+    const ignored = [];
+    for (const immunity of immunities ?? []) (types.includes(immunity?.type) ? ignored : kept).push(immunity);
+    return { kept, ignored };
+}
+
+/** The words for PF2e's damage breakdown: "Ignores its fire immunity". */
+export const ignoredImmunityWords = (ignored) => ignored.map((immunity) => `Ignores its ${immunity.type} immunity`);
 
 /**
  * The entries a damage roll carries from the roller's items' flags (flags[core].ignoreResistance: an entry or a list, each with an optional

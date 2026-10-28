@@ -13,7 +13,7 @@
 // }
 // io: { roll(statistic, { actor, modifier, dc }) → { degree }, damage?(instance) → number, choose?(decision) → value }
 
-import { DEGREES, SAVES } from "../model/constants.js";
+import { DEGREES, SAVES, isSkillOrLore } from "../model/constants.js";
 import { makeDecision } from "../model/decisions.js";
 import { drive, driveSync } from "../drive.js";
 import { healingOf, healsTarget, planWithActions, sharedDamageOf } from "./shared.js";
@@ -27,7 +27,9 @@ export const SAVE_KIND = "save";
 // Note effects, PF2e spell effects and manual instructions become changes the
 // GM or PF2e carries out (effect kinds "note" and "native", manual notes); the
 // Combat Simulator decides what of those it can model.
-const RESOLVED_PAYLOAD = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "casterChoice", "degreeAdjustment", "attackAdjustment", "heightenedVariants", "afflictionHandoff", "native", "conditionalDamage"]);
+const RESOLVED_PAYLOAD = new Set(["kind", "check", "sharedDamage", "outcomes", "postDamageTerminal", "casterChoice", "degreeAdjustment", "attackAdjustment", "heightenedVariants", "afflictionHandoff", "native", "conditionalDamage", "ignoreResistance", "ignoreImmunity"]);
+// (2026-10-27, the item module's Soulspark Candle: ignoreResistance [{ value, types }] and ignoreImmunity [types] on its damage — live play
+// passes them to the core's applyDamage patch, the simulator reads them on its damage.)
 const NOTE_PAYLOAD = new Set(["reminders", "dataNotes", "temporaryImmunity"]);
 const RESOLVED_OUTCOME = new Set(["damage", "effects", "forcedMovement", "modifiers", "noteEffects", "nativeEffects", "manualInstructions", "followUps", "terminal", "affliction", "conditionFloor"]);
 // (replacedLinks: the links live compiling replaced in the row's text — Calm's Spell Effect: Calm.)
@@ -60,11 +62,14 @@ export function saveGaps(plan) {
     if (resolution.healing && !healingOf(plan)) gaps.push({ path: "resolution.healing", what: "healing" });
     if (resolution.casterChoice && !CASTER_CHOICES.has(resolution.casterChoice.kind)) gaps.push({ path: "resolution.casterChoice", what: `casterChoice:${resolution.casterChoice.kind}` });
     const check = resolution.check;
-    const skillCheck = (check?.roll === "skill" || check?.roll === "perception") && check.statistic && check.against?.statistic;
+    // (2026-10-27, the item module's Mindsponge: or against a fixed DC, "a DC 28 Medicine check" — the user's own, its rows on the target.)
+    const skillCheck = (check?.roll === "skill" || check?.roll === "perception") && check.statistic && (check.against?.statistic || (check.against?.dc === "fixed" && Number(check.against.value) > 0));
     // (2026-10-15, asked by the item module: "automatic" — no roll, the success row — is resolved by saveSteps; before, it was reported as a gap.)
     // (2026-10-16, the item module's Mercurial Mantle: "the target attempts a @Check[perception|dc:38] check" — the target's Perception against a
     // fixed DC, rolled as a save is.)
-    const perceptionSave = check?.roll === "save" && check.statistic === "perception" && check.against?.dc === "fixed";
+    // (2026-10-27, the item module's Essence Prism, Whisperer of Souls, Mountain to the Sky…: a skill or a Lore the same way, "a DC 35 Athletics
+    // check" — each roller's own against the DC.)
+    const perceptionSave = check?.roll === "save" && (check.statistic === "perception" || isSkillOrLore(check.statistic)) && check.against?.dc === "fixed";
     if (!check || !(SAVES.includes(check.statistic) || check.statistic === "spell-attack" || check.statistic === "strike" || skillCheck || perceptionSave || check.roll === "automatic")) gaps.push({ path: "resolution.check", what: "check" });
     for (const degree of DEGREES) {
         const outcome = resolution.outcomes?.[degree];

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { clampD20, combineD20Limits, d20Mark, readD20Mark, selectiveDifficulty, terrainEffects, damageMemoryFrom, recentSource, rewriteRules, transformCreated, isSystemContextMessage, isTurnChange, ignoreEntries, ignoredResistanceOf, lowerResistances, loweredWords, rollIgnores } from "../src/patch-logic.js";
+import { clampD20, combineD20Limits, d20Mark, readD20Mark, selectiveDifficulty, terrainEffects, damageMemoryFrom, recentSource, rewriteRules, transformCreated, isSystemContextMessage, isTurnChange, ignoreEntries, ignoredResistanceOf, lowerResistances, loweredWords, rollIgnores, ignoredImmunitiesOf, keptImmunities, ignoredImmunityWords } from "../src/patch-logic.js";
 
 test("d20 limits: the tightest wins, and the clamp applies them", () => {
     assert.deepEqual(combineD20Limits([{ min: 5 }, { min: 10, max: 18 }, null, { max: 15 }]), { min: 10, max: 15 });
@@ -302,6 +302,18 @@ test("2026-10-27: a damage roll's ignored resistance from the roller's items —
     assert.deepEqual(kinds({ options: ["item:id:sword", "target:trait:construct"], domains: ["strike-damage"] }), ["cold", "acid"]);
     // (Not a Strike's: only what a predicate names.)
     assert.deepEqual(kinds({ options: ["target:trait:construct"], domains: ["spell-damage"] }), ["acid"]);
+});
+
+test("2026-10-27: every resistance lowered (types [\"*\"], Penetrating Ammunition), and an immunity ignored (Soulspark Candle)", () => {
+    const resistances = [{ type: "physical", value: 10 }, { type: "fire", value: 5 }];
+    assert.deepEqual(lowerResistances(resistances, ignoreEntries([{ value: 3, types: ["*"] }])).map(({ resistance, value }) => `${resistance.type} ${value}`), ["physical 7", "fire 2"]);
+    assert.deepEqual(lowerResistances(resistances, ignoreEntries([{ value: 3, types: ["*"] }, { value: 8, types: ["fire"] }])).map(({ value }) => value), [7, 0]);
+    assert.deepEqual(ignoredImmunitiesOf({ ignoreImmunity: ["fire"], damage: { options: { ignoreImmunity: "cold" } } }), ["fire", "cold"]);
+    assert.deepEqual(ignoredImmunitiesOf({ ignoreImmunity: ["*", "", 3] }), [], "only named types");
+    const immunities = [{ type: "fire" }, { type: "poison" }];
+    const { kept, ignored } = keptImmunities(immunities, ["fire"]);
+    assert.deepEqual([kept.map((entry) => entry.type), ignored.map((entry) => entry.type)], [["poison"], ["fire"]]);
+    assert.deepEqual(ignoredImmunityWords(ignored), ["Ignores its fire immunity"]);
 });
 
 test("2026-10-27: a round loaded into a firearm, crossbow or sling (its weapon's subitem) counts, once, and only for its own weapon's Strike", () => {

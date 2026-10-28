@@ -386,3 +386,29 @@ test("a target's Perception check against a fixed DC, rolled as a save (Mercuria
     resolveSaveSync(plan, context, { roll: (statistic, options) => { calls.push([statistic, options.actor.id, options.modifier, options.dc]); return { degree: "failure" }; } });
     assert.deepEqual(calls, [["perception", "a", 11, 38]]);
 });
+
+test("2026-10-27: a skill or a Lore against a fixed DC, rolled as a save (Mountain to the Sky's Athletics, Whisperer of Souls' Occultism): each roller's own", () => {
+    const plan = (statistic, dc = { dc: "fixed", value: 35 }) => ({ modelVersion: 13, source: { name: "Test Peak" }, rank: 1, resolution: { kind: "save", check: { roll: "save", statistic, against: dc }, outcomes: degreeRows({ failure: { effects: [{ kind: "condition", slug: "fatigued", value: null, duration: null }] } }) } });
+    for (const statistic of ["athletics", "occultism", "warfare-lore", "lore"]) assert.deepEqual(saveGaps(plan(statistic)), [], statistic);
+    assert.equal(saveGaps(plan("athletics", { dc: "source" })).length, 1, "a fixed DC only");
+    assert.equal(saveGaps(plan("flying")).length, 1, "a skill PF2e has, or a Lore");
+    const { context } = scene({ degrees: {} });
+    const base = context.statistic;
+    context.statistic = (actor, slug) => (slug === "athletics" ? { modifier: 14 } : base(actor, slug));
+    context.targets.length = 1;
+    const calls = [];
+    resolveSaveSync(plan("athletics"), context, { roll: (statistic, options) => { calls.push([statistic, options.actor.id, options.modifier, options.dc]); return { degree: "failure" }; } });
+    assert.deepEqual(calls, [["athletics", "a", 14, 35]]);
+});
+
+test("2026-10-27: the user's own skill against a fixed DC, its rows on the target (Mindsponge's DC 28 Medicine)", () => {
+    const plan = { modelVersion: 13, source: { name: "Test Sponge" }, rank: 1, resolution: { kind: "save", check: { roll: "skill", statistic: "medicine", against: { dc: "fixed", value: 28 } }, outcomes: degreeRows({ criticalFailure: { effects: [{ kind: "condition", slug: "drained", value: 1, duration: null }] } }) } };
+    assert.deepEqual(saveGaps(plan), []);
+    const { context } = scene({ degrees: {} });
+    const base = context.statistic;
+    context.statistic = (actor, slug) => (slug === "medicine" ? { modifier: 17 } : base(actor, slug));
+    context.targets.length = 1;
+    const calls = [];
+    resolveSaveSync(plan, context, { roll: (statistic, options) => { calls.push([statistic, options.actor?.id, options.target?.id, options.modifier, options.dc]); return { degree: "failure" }; } });
+    assert.deepEqual(calls, [["medicine", context.caster.id, "a", 17, 28]]);
+});

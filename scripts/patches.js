@@ -18,7 +18,7 @@
 // its own version (its markers are checked), so nothing is wrapped twice. The
 // core installs after every module's "ready" handlers have run.
 
-import { clampD20, combineD20Limits, d20Mark, damageMemoryFrom, ignoredResistanceOf, lowerResistances, loweredWords, readD20Mark, recentSource, rewriteRules, rollIgnores, selectiveDifficulty, terrainEffects, transformCreated, isSystemContextMessage, isTurnChange } from "../src/patch-logic.js";
+import { clampD20, combineD20Limits, d20Mark, damageMemoryFrom, ignoredImmunitiesOf, ignoredImmunityWords, ignoredResistanceOf, keptImmunities, lowerResistances, loweredWords, readD20Mark, recentSource, rewriteRules, rollIgnores, selectiveDifficulty, terrainEffects, transformCreated, isSystemContextMessage, isTurnChange } from "../src/patch-logic.js";
 import { activeGM, isLeadGM } from "./runtime-utils.js";
 import { wrapMethod } from "./wrap.js";
 
@@ -94,13 +94,28 @@ function installDamage() {
             lowered = [];
             console.warn(`${CORE_ID} | Lowering resistances failed.`, error);
         }
+        // (And an immunity ignored, Soulspark Candle's: left out of the creature's immunities the same way.)
+        let immunities = null;
+        try {
+            const types = ignoredImmunitiesOf(current);
+            const split = types.length ? keptImmunities(this.attributes?.immunities, types) : null;
+            if (split?.ignored.length) {
+                immunities = { list: this.attributes.immunities, kept: split.kept };
+                current = { ...current, breakdown: [...(current.breakdown ?? []), ...ignoredImmunityWords(split.ignored)] };
+            }
+        } catch (error) {
+            immunities = null;
+            console.warn(`${CORE_ID} | Ignoring immunities failed.`, error);
+        }
         const was = lowered.map(({ resistance }) => resistance.value);
         let result;
         try {
             for (const { resistance, value } of lowered) resistance.value = value;
+            if (immunities) this.attributes.immunities = immunities.kept;
             result = original(current, ...rest);
         } finally {
             lowered.forEach(({ resistance }, index) => (resistance.value = was[index]));
+            if (immunities) this.attributes.immunities = immunities.list;
         }
         if (!after.length) return result;
         // The after-callbacks are awaited in order, each on its own, before the
@@ -342,6 +357,9 @@ export const patchesApi = Object.freeze({
         // options.ignoreResistance, or an item flag flags["pf2e-resolution-core"].ignoreResistance stamped onto its roller's Strike damage
         // (src/patch-logic.js rollIgnores). lowered(actor, entries) says what it would lower.
         lowered: (actor, entries) => lowerResistances(actor?.attributes?.resistances, ignoredResistanceOf({ ignoreResistance: entries })).map(({ resistance, value }) => ({ type: resistance.type, from: resistance.value, to: value })),
+        // (2026-10-27) An immunity ignored: applyDamage({ …, ignoreImmunity: ["fire"] }) or a damage roll's options.ignoreImmunity. ignored(actor,
+        // types) says which of its immunities that leaves out.
+        ignored: (actor, types) => keptImmunities(actor?.attributes?.immunities, ignoredImmunitiesOf({ ignoreImmunity: types })).ignored.map((immunity) => immunity.type),
         lastTypes: (actorUuid) => lastDamageTypes.get(actorUuid)?.types ?? [],
         lastSource: (actorUuid) => lastDamageSource.get(actorUuid) ?? null,
         // The source stamped on a damage-taken message (the spell module's older stamp too).

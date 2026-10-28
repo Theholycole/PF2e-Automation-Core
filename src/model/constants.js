@@ -14,5 +14,8 @@ export const DECISION_PHASES = Object.freeze(["pre-cast", "pre-roll", "post-roll
 // ("automatic", 2026-10-15: no roll, every target's result the success row — the check family's, the ability and item modules' plans.)
 export const CHECK_ROLLS = Object.freeze(["save", "skill", "attack", "perception", "flat", "counteract", "automatic"]);
 export const SAVES = Object.freeze(["fortitude", "reflex", "will"]);
+// PF2e's skills; a Lore is any "<subject>-lore" (2026-10-27, skills and Lores rolled as saves at a fixed DC).
+export const SKILLS = Object.freeze(["acrobatics", "arcana", "athletics", "crafting", "deception", "diplomacy", "intimidation", "medicine", "nature", "occultism", "performance", "religion", "society", "stealth", "survival", "thievery"]);
+export const isSkillOrLore = (slug) => SKILLS.includes(slug) || /^[a-z0-9-]+-lore$/.test(String(slug ?? "")) || slug === "lore";
 
 export const FREQUENCY_PERIODS = Object.freeze(["round", "turn", "minute", "10-minutes", "hour", "day", "encounter"]);
