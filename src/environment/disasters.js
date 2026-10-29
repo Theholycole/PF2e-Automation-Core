@@ -69,6 +69,10 @@ export const fallingDamage = (feet) => (Number(feet) > 5 ? Math.floor(Number(fee
 // to the damage left. { feet, damage (after them all), before (the damage before reduceBy), prone, by, reductions: [{ source, itemUuid,
 // amount }] }. (2026-10-27, a Parachute Mail deployed low: { halved: true, source } — half the damage left after all that, rounded down;
 // the result then carries halved: its source.)
+// (2026-10-29, the item module's Impact Jelly: { nonlethal: true, source } — the damage left is nonlethal, the result's nonlethal its
+// source; and { landCheck: { statistics, dc, add?, per? }, source } — a creature the fall still hurts and lands prone may roll its best
+// of those statistics against dc, add more for every per feet fallen (the feet before any shorter), standing on a success: the result's
+// landCheck { statistics, dc, source }, the easiest when there are more. The damage is the same either way.)
 export function easedFall(feet, eases = []) {
     const list = (eases ?? []).filter(Boolean);
     const soft = list.find((entry) => entry.noDamage);
@@ -83,6 +87,22 @@ export function easedFall(feet, eases = []) {
     const half = before - amount > 0 ? list.find((entry) => entry.halved) : null;
     const damage = half ? Math.floor((before - amount) / 2) : before - amount;
     const feetFirst = list.find((entry) => entry.landsOnFeet);
-    const by = [...new Set([best?.source, amount > 0 ? reducer.source : null, half?.source, feetFirst ? feetFirst.source : null].filter(Boolean))].join(", ") || null;
-    return { feet: left, damage, before, prone: damage > 0 && !feetFirst, by, reductions, ...(half ? { halved: half.source ?? "halved" } : {}) };
+    const prone = damage > 0 && !feetFirst;
+    const gentle = damage > 0 ? list.find((entry) => entry.nonlethal) : null;
+    const check = prone ? landCheckOf(list, fallen) : null;
+    const by = [...new Set([best?.source, amount > 0 ? reducer.source : null, half?.source, feetFirst ? feetFirst.source : null, gentle?.source, check?.source].filter(Boolean))].join(", ") || null;
+    return { feet: left, damage, before, prone, by, reductions, ...(half ? { halved: half.source ?? "halved" } : {}), ...(gentle ? { nonlethal: gentle.source ?? "nonlethal" } : {}), ...(check ? { landCheck: check } : {}) };
+}
+
+// The easiest check to land standing of a fall's eases, its DC for the feet fallen: { statistics, dc, source } or null.
+function landCheckOf(list, fallen) {
+    const checks = list.map((entry) => {
+        const check = entry.landCheck;
+        const statistics = [check?.statistics ?? []].flat().filter((slug) => typeof slug === "string" && slug);
+        if (!statistics.length || !Number.isFinite(Number(check.dc))) return null;
+        const per = Number(check.per) > 0 ? Number(check.per) : 0;
+        const steps = per ? Math.floor(fallen / per) : 0;
+        return { statistics, dc: Number(check.dc) + (Number(check.add) || 0) * steps, source: entry.source ?? null };
+    }).filter(Boolean);
+    return checks.reduce((easiest, check) => (!easiest || check.dc < easiest.dc ? check : easiest), null);
 }

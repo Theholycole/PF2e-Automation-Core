@@ -209,6 +209,14 @@ test("disasters: an avalanche buries all but a critical success; pyroclastic flo
     assert.deepEqual(easedFall(90, [{ halved: true, source: "Parachute Mail" }, foam(20, "Lesser")]), { feet: 90, damage: 12, before: 45, prone: true, by: "Lesser, Parachute Mail", reductions: [{ source: "Lesser", itemUuid: "Item.Lesser", amount: 20 }], halved: "Parachute Mail" });
     assert.deepEqual(easedFall(60, [{ halved: true, source: "Parachute Mail" }, foam(50, "Moderate")]), { feet: 60, damage: 0, before: 30, prone: false, by: "Moderate", reductions: [{ source: "Moderate", itemUuid: "Item.Moderate", amount: 30 }] }, "nothing left to halve");
     assert.equal(easedFall(3, [{ halved: true, source: "Parachute Mail" }]).damage, 0);
+    // (2026-10-29, Impact Jelly: 50 feet shorter, its damage nonlethal, Acrobatics or Athletics against DC 10 + 1 a 10 feet fallen to land standing.)
+    const jelly = { shorter: 50, nonlethal: true, landCheck: { statistics: ["acrobatics", "athletics"], dc: 10, add: 1, per: 10 }, source: "Impact Jelly" };
+    assert.deepEqual(easedFall(80, [jelly]), { feet: 30, damage: 15, before: 15, prone: true, by: "Impact Jelly", reductions: [], nonlethal: "Impact Jelly", landCheck: { statistics: ["acrobatics", "athletics"], dc: 18, source: "Impact Jelly" } });
+    assert.deepEqual(easedFall(55, [jelly]), { feet: 5, damage: 0, before: 0, prone: false, by: "Impact Jelly", reductions: [] }, "unhurt: neither nonlethal nor a check");
+    assert.deepEqual(easedFall(80, [jelly, { landsOnFeet: true, source: "Belt" }]), { feet: 30, damage: 15, before: 15, prone: false, by: "Impact Jelly, Belt", reductions: [], nonlethal: "Impact Jelly" }, "on its feet already: no check");
+    assert.equal(easedFall(80, [jelly, { landCheck: { statistics: "acrobatics", dc: 15 }, source: "Other" }]).landCheck.dc, 15, "the easiest check");
+    assert.equal(easedFall(200, [jelly, { shorter: 120, source: "Tumbler's Belt" }]).landCheck.dc, 30, "the feet fallen, not the shorter fall");
+    assert.equal(easedFall(80, [{ ...jelly, landCheck: { dc: 10 } }]).landCheck, undefined, "no statistics: no check");
 });
 
 test("terrain: ice is difficult uneven ground, heavy undergrowth gives cover, lava burns each turn", () => {
