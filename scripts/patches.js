@@ -21,6 +21,7 @@
 import { clampD20, combineD20Limits, d20Mark, damageMemoryFrom, ignoredImmunitiesOf, ignoredImmunityWords, ignoredResistanceOf, keptImmunities, lowerResistances, loweredWords, readD20Mark, recentSource, rewriteRules, rollIgnores, selectiveDifficulty, terrainEffects, transformCreated, isSystemContextMessage, isTurnChange } from "../src/patch-logic.js";
 import { activeGM, isLeadGM } from "./runtime-utils.js";
 import { wrapMethod } from "./wrap.js";
+import { checkCreated } from "./immunity-notice.js";
 
 const CORE_ID = "pf2e-resolution-core";
 const SPELL_MODULE_ID = "pf2e-automatic-resolution";
@@ -186,6 +187,8 @@ function installRules() {
     });
     wrapMethod(CORE_ID, `CONFIG.${SHARED}.ItemPF2e.createDocuments`, async function (create, data = [], options = {}, ...rest) {
         if (createTransformers.length && options?.parent) data = transformCreated(createTransformers, data, options.parent);
+        // (2026-11-11: an Effect or condition PF2e is about to drop for an immunity — the GM told, scripts/immunity-notice.js.)
+        if (options?.parent) checkCreated(data, options.parent);
         return create(data, options, ...rest);
     });
     markInstalled("rules");
