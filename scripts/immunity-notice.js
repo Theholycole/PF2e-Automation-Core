@@ -100,8 +100,11 @@ function itemFrom(source, actor) {
 
 // "Frightened 2", "Effect: Inspire Courage" → its words for the notice.
 function effectName(item, source) {
+    // (Its source's name: PF2e already gives an embedded condition's name its value, "Frightened 2" — found in the 2026-11-11 Foundry test.)
+    const base = source?.name ?? item?._source?.name ?? item?.name ?? "an effect";
     const value = item?.isOfType?.("condition") ? Number(item.value ?? source?.system?.value?.value) : NaN;
-    return Number.isFinite(value) && value > 0 && item?.system?.value?.isValued !== false ? `${item.name} ${value}` : item?.name ?? source?.name ?? "an effect";
+    if (/\s\d+$/.test(base)) return base;
+    return Number.isFinite(value) && value > 0 && item?.system?.value?.isValued !== false ? `${base} ${value}` : base;
 }
 
 function originName(item) {
