@@ -10,6 +10,7 @@ import { installEarlyPatches, installPatches, patchesApi } from "./patches.js";
 import * as forcedMovement from "./forced-movement.js";
 import * as dying from "./dying-recovery.js";
 import { immunityApi, listenForNotices, registerImmunitySetting } from "./immunity-notice.js";
+import { installDCPrivacy, registerDCPrivacySetting } from "./dc-privacy.js";
 
 export const CORE_ID = "pf2e-resolution-core";
 
@@ -35,6 +36,9 @@ const api = Object.freeze({
 // the API exists from this module's "init" (dependencies load first).
 Hooks.once("init", () => {
     registerImmunitySetting();
+    registerDCPrivacySetting();
+    // (2026-11-21) Players don't see monster DCs on the suite's cards (from "init": the chat log renders before "ready").
+    installDCPrivacy();
     game.modules.get(CORE_ID).api = api;
     Hooks.callAll("pf2eResolutionCoreReady", api);
 });
@@ -42,3 +46,4 @@ Hooks.once("init", () => {
 Hooks.once("setup", installEarlyPatches);
 Hooks.once("ready", installPatches);
 Hooks.once("ready", listenForNotices);
+
